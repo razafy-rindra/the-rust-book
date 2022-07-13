@@ -1,6 +1,6 @@
 \input{template.tex}
 \title{Rust Course notes}
-\author{Razafy Rindra, "Hagamena"}
+\author{Razafy Rindra, ``Hagamena''}
 
 \begin{document}
 
@@ -8,10 +8,10 @@
 \tableofcontents
 \newpage
 \section{Introduction}
-Some quick notes from the Rust book, and the "Let's Get Rusty" \href{https://youtube.com/playlist?list=PLai5B987bZ9CoVR-QEIN9foz4QCJ0H2Y8}{online course}
+Some quick notes from the Rust book, and the ``Let's Get Rusty'' \href{https://youtube.com/playlist?list=PLai5B987bZ9CoVR-QEIN9foz4QCJ0H2Y8}{online course}
 \section{Common Programming Concepts in Rust}
 \subsection{Variables and Mutability}
-\subsubsection{Mutable variables} Variables in Rust are immmutable by default. In order to createe a mutable variable, we need to add in 'mut' in front of the name like so:
+\subsubsection{Mutable variables} Variables in Rust are immmutable by default. In order to createe a mutable variable, we need to add in `mut' in front of the name like so:
 \begin{verbatim}
 fn main() {
     let mut x = 5;
@@ -27,7 +27,12 @@ fn main() {
 Constants unlike variables can't be mutable, need to be type annotated and they can't be assigned to return value of a function or any value computed at run time.
 
 \subsubsection{Shadowing}
-
+Shadowing allows us to create a new variable with an existing name, for example:\begin{verbatim}
+    let x = 5;
+    println!("The value of x is: {x}");
+    let x = "six";
+    println!("The value of x is: {x}");
+\end{verbatim}
 
 \subsection{Data Types}
 \begin{definition}
@@ -63,7 +68,7 @@ A piece in code in Rust are either a statement or an expression. Statements perf
     }
 \end{verbatim}
 
-In this function, the println are statements since they don't return anything while 'x+y' is an expression, it is returned by the function (note the last expression of a function is implicitely returned). 
+In this function, the println are statements since they don't return anything while `x+y' is an expression, it is returned by the function (note the last expression of a function is implicitely returned). 
 
 \subsection{Control Flow}
 \subsubsection{if statements}
@@ -81,7 +86,7 @@ As in other programming languages:\begin{verbatim}
 }
    
 \end{verbatim}
-Note, the condition must be a boolean. We can also set a "if-else" statement in a let statemetn.\begin{verbatim}
+Note, the condition must be a boolean. We can also set a ``if-else'' statement in a let statemetn.\begin{verbatim}
     fn main() {
     let condition = true;
     let number = if condition { 5 } else { 6 };
@@ -90,7 +95,7 @@ Note, the condition must be a boolean. We can also set a "if-else" statement in 
 }
 \end{verbatim}
 \subsubsection{Loops}
-We can create loops with the 'loop' keyword, which will execute the code in it until we call break.\begin{verbatim}
+We can create loops with the `loop' keyword, which will execute the code in it until we call break.\begin{verbatim}
     let mut counter = 0;
     let result = loop{
        counter += 1;
@@ -108,7 +113,7 @@ We can also use the while statement:\begin{verbatim}
     }
 \end{verbatim}
 
-Finally the third type of loop we can create are 'for loops'\begin{verbatim}
+Finally the third type of loop we can create are `for loops'\begin{verbatim}
     let a = [10,20,30,40,50];
     
     for element in a.iter{
@@ -122,4 +127,316 @@ We can also loop over a range:\begin{verbatim}
     }
 \end{verbatim}
 The last number of the range is excluded.
+\subsection{Ownership}
+\paragraph*{What is ownership?}
+The ownership model is a way to manage memory. How do we manage memory today?\begin{enumerate}
+    \item Garbage collection.
+Used in high level languages like java or $C\#$, the Garbage collection manages memory for you.
+It's pros is that is error free, you don't have to manage memory yourself so you won't introduce memory bugs. It also faster write time.
+
+It's cons is that you have no control over memory, it is slower and has unpredictable runtime performance and larger program size since you got to include a garbage collector.
+
+    \item Manual memory management
+    
+It's pros are that you have higher control over memory, faster runtime and smaller program size. But it is error prone and has slower writing time.
+
+Notice that these two have opposite trade-offs.
+
+    \item Ownership model
+    
+This is the way Rust manages memory, it's pros are control over memory, faster runtime and smaller program size and is error free (though it does allow for you to opt-out of memory safetey).
+It's cons is that you have a slower write time, slower than with Manual memeory management, Rust has a strict set of rules around memory management.
+\end{enumerate}
+
+\paragraph*{Stack and Heap}
+During runetime program has access of stack and heap, stack is fixed size and cannot grow or shrink during runetime and it creates stack-frames for each function 
+it executes. Each stack frames stores the local variables of the function they execute, their size are calculated during compile time and variables in stack frames 
+only live as long as the stack lives.
+
+\
+
+The heap grows and shrinks during runtime and the data stored can be dynamic in size and we control the lifetime of the data.
+
+Pushing to the stack is faster than allocating on the heap since the heap has to spend time looking for a place to store the data, also accessing data on the stack is faster 
+than accessing data on the heap, since on the heap we must follow the pointer.
+
+\begin{verbatim}
+    let x = "hello";
+\end{verbatim}
+This is a string litteral and has fixed size and is stored in the stack-frame.
+
+\begin{verbatim}
+    let x = String::from(world");
+\end{verbatim}
+x is of type String which can be dynamic in size so it can't be stored on the stack, we ask the heap to allocate memory for it 
+and it passes back a pointer, which is what is stored on the stack. 
+
+\subsubsection{Ownership Rules}
+
+\begin{enumerate}
+    \item Each value in Rust has a variable called its owner.
+    \item There can only be one owner at a time.
+    \item When the owner goes out of scope, the value will be dropped.
+\end{enumerate}
+
+\begin{example}
+
+    \
+
+    \begin{verbatim}
+        fn main(){
+            let x = 5;
+            let y = x; // Copy
+
+            let s1 = String::from("hello");
+            let s2 = s1; // move (not a shallow copy)
+
+            println!("{}, world", s1);
+        }
+    \end{verbatim}
+This returns an error since when we created s2 we made it point to the same ``hello'' on the heap that s1 points to, but in order to 
+ensure memory safetey, Rust invalidates s1. 
+
+What if we do want to clone the string? Use the clone() method: \begin{verbatim}
+    fn main(){
+        let x = 5;
+        let y = x; // Copy
+
+        let s1 = String::from("hello");
+        let s2 = s1.clone();
+
+        println!("{}, world", s1);
+    }
+\end{verbatim}
+\end{example}
+
+\subsubsection{Ownership and functions}
+\begin{example}
+
+    \
+
+    \begin{verbatim}
+        fn main(){
+            let s = String::from("hello);
+            takes_ownership(s);
+            println!("{}", s);
+        }
+
+        fn takes_ownership(some_string: String){
+            println!("{}", some_string);
+        }
+    \end{verbatim}
+
+This gives us an error since after we pass a parameter in a function it is the same as if we assign the parameter to another variable.
+
+So we move s into some\_string and after takes\_ownership scope is done some\_string is dropped.
+
+\begin{example}
+    
+    \
+
+    \begin{verbatim}
+        fn main() {
+            let s1 = gives_ownership();
+            println!("s1 = {}", s1);
+        }
+
+        fn gives_ownership(){
+            let some_string = String::from("hello");
+            some_string \\ returning the string moves ownership to s1
+        }
+    \end{verbatim}
+\end{example}
+\begin{example}
+    
+    \
+
+    \begin{verbatim}
+        fn main() {
+        let s1 = gives_ownership();         // gives_ownership moves its return
+                                            // value into s1
+    
+        let s2 = String::from("hello");     // s2 comes into scope
+    
+        let s3 = takes_and_gives_back(s2);  // s2 is moved into
+                                            // takes_and_gives_back, which also
+                                            // moves its return value into s3
+    } // Here, s3 goes out of scope and is dropped. s2 was moved, so nothing
+      // happens. s1 goes out of scope and is dropped.
+    
+    fn gives_ownership() -> String {             // gives_ownership will move its
+                                                 // return value into the function
+                                                 // that calls it
+    
+        let some_string = String::from("yours"); // some_string comes into scope
+    
+        some_string                              // some_string is returned and
+                                                 // moves out to the calling
+                                                 // function
+    }
+    
+    // This function takes a String and returns one
+    fn takes_and_gives_back(a_string: String) -> String { // a_string comes into
+                                                          // scope
+    
+        a_string  // a_string is returned and moves out to the calling function
+    }
+    \end{verbatim}
+    
+
+\end{example}
+
+Moving ownership and giving back is tedious, what if we just want to use variable without taking ownership? Use references.
+
+\end{example}
+\subsection{References}
+
+Let us see how references fix the following situation\begin{verbatim}
+    fn main() {
+    let s1 = String::from("hello");
+
+    let (s2, len) = calculate_length(s1);
+
+    println!("The length of '{}' is {}.", s2, len);
+}
+
+fn calculate_length(s: String) -> (String, usize) {
+    let length = s.len(); // len() returns the length of a String
+
+    (s, length)
+}
+\end{verbatim}
+
+Here in order to calculate the length of the string without taking ownershipe, we need to return a tuple that returns both the string and the length.
+
+\begin{verbatim}
+    fn main() {
+        let s1 = String::from("hello");
+    
+        let len = calculate_length(&s1);
+    
+        println!("The length of '{}' is {}.", s1, len);
+    }
+    
+    fn calculate_length(s: &String) -> usize {
+        let length = s.len(); // len() returns the length of a String
+        length 
+    }
+\end{verbatim}
+
+Here s is a reference of a string and takes no ownership of the string, it points to s1 which points to the string.
+So when the function finishes executing s is dropped without affecting s1.
+
+\begin{definition}
+    Passing in references as function paramaters is called \textbf{borrowing}. Since we are not taking ownership of the parameters.
+\end{definition} 
+Note that references are immutable by default, so how to we modify value without taking ownership?
+
+Mutable references:
+
+\begin{verbatim}
+    fn main() {
+    let mut s1 = String::from("hello");
+
+    change(&mut s1);
+}
+
+fn change(some_string: &mut String) {
+    some_string.push_str(", world");
+}
+\end{verbatim}
+
+Now change can mutate the value of s1 without taking ownership. Mutable reference have a restriction, we can only have one mutable reference to a particular piece of data 
+in a particular scope.
+
+
+\begin{verbatim}
+    fn main() {
+    let mut s = String::from("hello");
+
+    let r1 = &mut s;
+    let r2 = &mut s; \\ Returns an error since can't borrow twice.
+
+    println!("{}, {}", r1, r2);
+}
+\end{verbatim}
+
+This prevents ``data races'' where two pointers point at the same data and one pointer reads the data and another one tries to write to the data.
+
+
+What if we try to mix mutable and immutable references? We get another error, we can't have mutable reference if an immutable referece already exists. Immuatble reference don't expect the underlying data to change.
+But we can have many Immuatble references, since we don't expect the underlying value to change.
+
+Note the scope of a reference starts when it introduced and ends when it's used for the last time, so we can define a mutable reference when all the immuatble references are out of scope(so after we use them for the last time).
+
+\paragraph*{Rules of Refences}\begin{enumerate}
+    \item At any given time, we can either have one mutable reference or any number of immuatble reference.
+    \item References must always be valid.
+\end{enumerate}
+
+\subsection{Slices}
+
+\begin{definition}
+    Slices let you a contiguous sequence of elements in a collection instead of the whole collection, without taking ownership.
+\end{definition}
+
+\begin{verbatim}
+    fn first_word(s: &String) -> usize {
+    let bytes = s.as_bytes();
+
+    for (i, &item) in bytes.iter().enumerate() {
+        if item == b' ' {
+            return i;
+        }
+    }
+
+    s.len()
+}
+
+fn main() {}
+\end{verbatim}
+
+There are two problems with this, the return value of first\_word is not tied to the string.
+If we change the string, the value of the length of the first word doesn't change.
+
+If we wanted to return the second word, we must retrurn a tuple with the index at the start of the word and the index at the end of the word.
+We have more values we must keep in sync.
+
+Let us use the string slice:
+
+\begin{verbatim}
+    fn main() {
+    let mut s = String::from("hello world");
+
+    let hello = &s[..5]; \\String Slices, tells us we want the value of the string from index 0 to 4
+    let world = &s[6..]; \\String Slices, tells us we want the value of the string from index 6 to 10
+    
+    let s2 = "hello word"; \\ String litteral are string slices!
+
+    let word = first_word(s2);
+
+    fn first_word(s: &str) -> &str {
+        let bytes = s.as_bytes();
+    
+        for (i, &item) in bytes.iter().enumerate() {
+            if item == b' ' {
+                return &s[0..i];
+            }
+        }
+    
+        &s[..]
+    }
+    
+}
+
+\end{verbatim}
+
+We can also create slice of array 
+
+\begin{verbatim}
+    fn main(){
+        let a = [1,2,3,4,5];
+        let slice = &a[0..2]; \\ This is of type &[i32]
+    }
+\end{verbatim}
 \end{document}
