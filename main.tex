@@ -1,0 +1,125 @@
+\input{template.tex}
+\title{Rust Course notes}
+\author{Razafy Rindra, "Hagamena"}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+\section{Introduction}
+Some quick notes from the Rust book, and the "Let's Get Rusty" \href{https://youtube.com/playlist?list=PLai5B987bZ9CoVR-QEIN9foz4QCJ0H2Y8}{online course}
+\section{Common Programming Concepts in Rust}
+\subsection{Variables and Mutability}
+\subsubsection{Mutable variables} Variables in Rust are immmutable by default. In order to createe a mutable variable, we need to add in 'mut' in front of the name like so:
+\begin{verbatim}
+fn main() {
+    let mut x = 5;
+    println!("The value of x is: {x}");
+    x = 6;
+    println!("The value of x is: {x}");
+}
+\end{verbatim}
+\subsubsection{Constants} We can also declare constants in Rust like so:\begin{verbatim}
+    const MY_NUMBER: u32 = 100_000;
+\end{verbatim}
+
+Constants unlike variables can't be mutable, need to be type annotated and they can't be assigned to return value of a function or any value computed at run time.
+
+\subsubsection{Shadowing}
+
+
+\subsection{Data Types}
+\begin{definition}
+    \textbf{Scalar data types} represent a single value, \textbf{Compound data types} represent a goup of values
+\end{definition}
+Types of scalar data types\begin{enumerate}
+    \item Integers, they can be 8,16,32,64,128 bit signed or unsigned integers.
+    \item Floating-point numbers
+    \item Booleans
+    \item Character, they represent unicode character
+\end{enumerate}
+Type of compound data types\begin{enumerate}
+    \item Tuples; a fixed size array of data that can be of different values.
+    \begin{verbatim}
+        let tup = ("Let's Get Rusty!",100_000);
+    \end{verbatim}
+    \item Arrays, in Rust they are fixed length.
+\end{enumerate}
+\subsection{Functions}
+Functions are defined with an fn keyword like so:\begin{verbatim}
+    fn my_function(x: i32,y: i32){
+         println!("The value of x is: {}", x);
+         println!("The value of y is: {}", y);
+    }
+\end{verbatim}
+
+A piece in code in Rust are either a statement or an expression. Statements perform some action but do not return any value, whilst expressions returns values. 
+\begin{verbatim}
+    fn my_function(x: i32,y: i32) -> i32{
+         println!("The value of x is: {}", x);
+         println!("The value of y is: {}", y);
+         x+y
+    }
+\end{verbatim}
+
+In this function, the println are statements since they don't return anything while 'x+y' is an expression, it is returned by the function (note the last expression of a function is implicitely returned). 
+
+\subsection{Control Flow}
+\subsubsection{if statements}
+As in other programming languages:\begin{verbatim}
+ fn main() {
+    let number = 3;
+
+    if number < 5 {
+        println!("first condition was true");
+    } else if number < 22{
+        println!("second condition was true.")
+    }else{
+        println!("condition was false");
+    }
+}
+   
+\end{verbatim}
+Note, the condition must be a boolean. We can also set a "if-else" statement in a let statemetn.\begin{verbatim}
+    fn main() {
+    let condition = true;
+    let number = if condition { 5 } else { 6 };
+
+    println!("The value of number is: {number}");
+}
+\end{verbatim}
+\subsubsection{Loops}
+We can create loops with the 'loop' keyword, which will execute the code in it until we call break.\begin{verbatim}
+    let mut counter = 0;
+    let result = loop{
+       counter += 1;
+       if counter == 10{
+            break counter;
+       }
+    };
+\end{verbatim}
+
+We can also use the while statement:\begin{verbatim}
+    let mut number = 3;
+    while number != 0{
+        println!("{}!", number);
+        number -= 1;
+    }
+\end{verbatim}
+
+Finally the third type of loop we can create are 'for loops'\begin{verbatim}
+    let a = [10,20,30,40,50];
+    
+    for element in a.iter{
+        println!("The value is: {}", element);
+    }
+\end{verbatim}
+
+We can also loop over a range:\begin{verbatim}
+    for number in 1..4{
+        println!("{}!", number);
+    }
+\end{verbatim}
+The last number of the range is excluded.
+\end{document}
