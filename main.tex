@@ -1,4 +1,39 @@
 \input{template.tex}
+\usepackage{fancyvrb, framed, verbatim}
+\usepackage{listings}
+\usepackage[T1]{fontenc}
+\definecolor{shadecolor}{rgb}{.9, .9, .9}
+
+\lstset{ 
+  language=C,
+  backgroundcolor=\color[rgb]{0.1,0.1,0.1},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
+  showstringspaces=false,          % So that it hides the spaces in strings
+  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  captionpos=b,                    % sets the caption-position to bottom
+  firstnumber=1,                % start line enumeration with line 1
+  frame=single,	                   % adds a frame around the code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+  numbersep=5pt,                   % how far the line-numbers are from the code
+  numberstyle=\tiny\color{gray}, % the style that is used for the line-numbers
+  stepnumber=1,                    % the step between two line-numbers. If it's 1, each line will be numbered
+  tabsize=2,	                   % sets default tabsize to 2 spaces
+  commentstyle=\color{YellowGreen},    % comment style
+  stringstyle=\color{DarkOrchid},     % string literal style
+ % keywordstyle=\color{ForestGreen},       % keyword style
+  upquote=true                     %Fixing the quotes
+}
+\pagecolor[rgb]{0.1,0.1,0.1}
+\color[rgb]{0,0.6,0}
+
+
+\newenvironment{code}%
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
+
 \title{Rust Course notes}
 \author{Razafy Rindra, ``Hagamena''}
 
@@ -11,28 +46,33 @@
 Some quick notes from the Rust book, and the ``Let's Get Rusty'' \href{https://youtube.com/playlist?list=PLai5B987bZ9CoVR-QEIN9foz4QCJ0H2Y8}{online course}
 \section{Common Programming Concepts in Rust}
 \subsection{Variables and Mutability}
-\subsubsection{Mutable variables} Variables in Rust are immmutable by default. In order to createe a mutable variable, we need to add in `mut' in front of the name like so:
-\begin{verbatim}
-fn main() {
-    let mut x = 5;
-    println!("The value of x is: {x}");
-    x = 6;
-    println!("The value of x is: {x}");
+\subsubsection{Mutable variables} 
+Variables in Rust are immmutable by default. In order to createe a mutable variable, we need to add in `mut' in front of the name like so:
+\begin{lstlisting}
+    fn main() {
+        let mut x = 5;
+        println!("The value of x is: {x}");
+        x = 6;
+        println!("The value of x is: {x}"); 
 }
-\end{verbatim}
-\subsubsection{Constants} We can also declare constants in Rust like so:\begin{verbatim}
-    const MY_NUMBER: u32 = 100_000;
-\end{verbatim}
+\end{lstlisting}
+
+
+\subsubsection{Constants} We can also declare constants in Rust like so:
+\begin{lstlisting}
+    const my_number: u32 = 100_000;
+\end{lstlisting}
 
 Constants unlike variables can't be mutable, need to be type annotated and they can't be assigned to return value of a function or any value computed at run time.
 
 \subsubsection{Shadowing}
-Shadowing allows us to create a new variable with an existing name, for example:\begin{verbatim}
+Shadowing allows us to create a new variable with an existing name, for example:
+\begin{lstlisting}
     let x = 5;
     println!("The value of x is: {x}");
     let x = "six";
     println!("The value of x is: {x}");
-\end{verbatim}
+\end{lstlisting}
 
 \subsection{Data Types}
 \begin{definition}
@@ -46,33 +86,33 @@ Types of scalar data types\begin{enumerate}
 \end{enumerate}
 Type of compound data types\begin{enumerate}
     \item Tuples; a fixed size array of data that can be of different values.
-    \begin{verbatim}
+    \begin{lstlisting}
         let tup = ("Let's Get Rusty!",100_000);
-    \end{verbatim}
+    \end{lstlisting}
     \item Arrays, in Rust they are fixed length.
 \end{enumerate}
 \subsection{Functions}
-Functions are defined with an fn keyword like so:\begin{verbatim}
+Functions are defined with an fn keyword like so:\begin{lstlisting}
     fn my_function(x: i32,y: i32){
          println!("The value of x is: {}", x);
          println!("The value of y is: {}", y);
     }
-\end{verbatim}
+\end{lstlisting}
 
 A piece in code in Rust are either a statement or an expression. Statements perform some action but do not return any value, whilst expressions returns values. 
-\begin{verbatim}
+\begin{lstlisting}
     fn my_function(x: i32,y: i32) -> i32{
          println!("The value of x is: {}", x);
          println!("The value of y is: {}", y);
          x+y
     }
-\end{verbatim}
+\end{lstlisting}
 
 In this function, the println are statements since they don't return anything while `x+y' is an expression, it is returned by the function (note the last expression of a function is implicitely returned). 
 
 \subsection{Control Flow}
 \subsubsection{if statements}
-As in other programming languages:\begin{verbatim}
+As in other programming languages:\begin{lstlisting}
  fn main() {
     let number = 3;
 
@@ -84,18 +124,17 @@ As in other programming languages:\begin{verbatim}
         println!("condition was false");
     }
 }
-   
-\end{verbatim}
-Note, the condition must be a boolean. We can also set a ``if-else'' statement in a let statemetn.\begin{verbatim}
+\end{lstlisting}
+Note, the condition must be a boolean. We can also set a ``if-else'' statement in a let statemetn.\begin{lstlisting}
     fn main() {
     let condition = true;
     let number = if condition { 5 } else { 6 };
 
     println!("The value of number is: {number}");
 }
-\end{verbatim}
+\end{lstlisting}
 \subsubsection{Loops}
-We can create loops with the `loop' keyword, which will execute the code in it until we call break.\begin{verbatim}
+We can create loops with the `loop' keyword, which will execute the code in it until we call break.\begin{lstlisting}
     let mut counter = 0;
     let result = loop{
        counter += 1;
@@ -103,31 +142,31 @@ We can create loops with the `loop' keyword, which will execute the code in it u
             break counter;
        }
     };
-\end{verbatim}
+\end{lstlisting}
 
-We can also use the while statement:\begin{verbatim}
+We can also use the while statement:\begin{lstlisting}
     let mut number = 3;
     while number != 0{
         println!("{}!", number);
         number -= 1;
     }
-\end{verbatim}
+\end{lstlisting}
 
-Finally the third type of loop we can create are `for loops'\begin{verbatim}
+Finally the third type of loop we can create are `for loops'\begin{lstlisting}
     let a = [10,20,30,40,50];
     
     for element in a.iter{
         println!("The value is: {}", element);
     }
-\end{verbatim}
+\end{lstlisting}
 
-We can also loop over a range:\begin{verbatim}
+We can also loop over a range:\begin{lstlisting}
     for number in 1..4{
         println!("{}!", number);
     }
-\end{verbatim}
+\end{lstlisting}
 The last number of the range is excluded.
-\subsection{Ownership}
+\section{Ownership}
 \paragraph*{What is ownership?}
 The ownership model is a way to manage memory. How do we manage memory today?\begin{enumerate}
     \item Garbage collection.
@@ -160,18 +199,18 @@ The heap grows and shrinks during runtime and the data stored can be dynamic in 
 Pushing to the stack is faster than allocating on the heap since the heap has to spend time looking for a place to store the data, also accessing data on the stack is faster 
 than accessing data on the heap, since on the heap we must follow the pointer.
 
-\begin{verbatim}
+\begin{lstlisting}
     let x = "hello";
-\end{verbatim}
+\end{lstlisting}
 This is a string litteral and has fixed size and is stored in the stack-frame.
 
-\begin{verbatim}
+\begin{lstlisting}
     let x = String::from(world");
-\end{verbatim}
+\end{lstlisting}
 x is of type String which can be dynamic in size so it can't be stored on the stack, we ask the heap to allocate memory for it 
 and it passes back a pointer, which is what is stored on the stack. 
 
-\subsubsection{Ownership Rules}
+\subsection{Ownership Rules}
 
 \begin{enumerate}
     \item Each value in Rust has a variable called its owner.
@@ -183,7 +222,7 @@ and it passes back a pointer, which is what is stored on the stack.
 
     \
 
-    \begin{verbatim}
+    \begin{lstlisting}
         fn main(){
             let x = 5;
             let y = x; // Copy
@@ -193,11 +232,11 @@ and it passes back a pointer, which is what is stored on the stack.
 
             println!("{}, world", s1);
         }
-    \end{verbatim}
+    \end{lstlisting}
 This returns an error since when we created s2 we made it point to the same ``hello'' on the heap that s1 points to, but in order to 
 ensure memory safetey, Rust invalidates s1. 
 
-What if we do want to clone the string? Use the clone() method: \begin{verbatim}
+What if we do want to clone the string? Use the clone() method: \begin{lstlisting}
     fn main(){
         let x = 5;
         let y = x; // Copy
@@ -207,15 +246,15 @@ What if we do want to clone the string? Use the clone() method: \begin{verbatim}
 
         println!("{}, world", s1);
     }
-\end{verbatim}
+\end{lstlisting}
 \end{example}
 
-\subsubsection{Ownership and functions}
+\subsection{Ownership and functions}
 \begin{example}
 
     \
 
-    \begin{verbatim}
+    \begin{lstlisting}
         fn main(){
             let s = String::from("hello);
             takes_ownership(s);
@@ -225,7 +264,7 @@ What if we do want to clone the string? Use the clone() method: \begin{verbatim}
         fn takes_ownership(some_string: String){
             println!("{}", some_string);
         }
-    \end{verbatim}
+    \end{lstlisting}
 
 This gives us an error since after we pass a parameter in a function it is the same as if we assign the parameter to another variable.
 
@@ -235,7 +274,7 @@ So we move s into some\_string and after takes\_ownership scope is done some\_st
     
     \
 
-    \begin{verbatim}
+    \begin{lstlisting}
         fn main() {
             let s1 = gives_ownership();
             println!("s1 = {}", s1);
@@ -243,15 +282,15 @@ So we move s into some\_string and after takes\_ownership scope is done some\_st
 
         fn gives_ownership(){
             let some_string = String::from("hello");
-            some_string \\ returning the string moves ownership to s1
+            some_string // returning the string moves ownership to s1
         }
-    \end{verbatim}
+    \end{lstlisting}
 \end{example}
 \begin{example}
     
     \
 
-    \begin{verbatim}
+    \begin{lstlisting}
         fn main() {
         let s1 = gives_ownership();         // gives_ownership moves its return
                                             // value into s1
@@ -281,7 +320,7 @@ So we move s into some\_string and after takes\_ownership scope is done some\_st
     
         a_string  // a_string is returned and moves out to the calling function
     }
-    \end{verbatim}
+    \end{lstlisting}
     
 
 \end{example}
@@ -291,7 +330,7 @@ Moving ownership and giving back is tedious, what if we just want to use variabl
 \end{example}
 \subsection{References}
 
-Let us see how references fix the following situation\begin{verbatim}
+Let us see how references fix the following situation\begin{lstlisting}
     fn main() {
     let s1 = String::from("hello");
 
@@ -305,11 +344,11 @@ fn calculate_length(s: String) -> (String, usize) {
 
     (s, length)
 }
-\end{verbatim}
+\end{lstlisting}
 
 Here in order to calculate the length of the string without taking ownershipe, we need to return a tuple that returns both the string and the length.
 
-\begin{verbatim}
+\begin{lstlisting}
     fn main() {
         let s1 = String::from("hello");
     
@@ -322,7 +361,7 @@ Here in order to calculate the length of the string without taking ownershipe, w
         let length = s.len(); // len() returns the length of a String
         length 
     }
-\end{verbatim}
+\end{lstlisting}
 
 Here s is a reference of a string and takes no ownership of the string, it points to s1 which points to the string.
 So when the function finishes executing s is dropped without affecting s1.
@@ -334,7 +373,7 @@ Note that references are immutable by default, so how to we modify value without
 
 Mutable references:
 
-\begin{verbatim}
+\begin{lstlisting}
     fn main() {
     let mut s1 = String::from("hello");
 
@@ -344,22 +383,23 @@ Mutable references:
 fn change(some_string: &mut String) {
     some_string.push_str(", world");
 }
-\end{verbatim}
+\end{lstlisting}
 
 Now change can mutate the value of s1 without taking ownership. Mutable reference have a restriction, we can only have one mutable reference to a particular piece of data 
 in a particular scope.
 
+\newpage
 
-\begin{verbatim}
+\begin{lstlisting}
     fn main() {
     let mut s = String::from("hello");
 
     let r1 = &mut s;
-    let r2 = &mut s; \\ Returns an error since can't borrow twice.
+    let r2 = &mut s; // Returns an error since can not borrow twice.
 
     println!("{}, {}", r1, r2);
 }
-\end{verbatim}
+\end{lstlisting}
 
 This prevents ``data races'' where two pointers point at the same data and one pointer reads the data and another one tries to write to the data.
 
@@ -380,7 +420,7 @@ Note the scope of a reference starts when it introduced and ends when it's used 
     Slices let you a contiguous sequence of elements in a collection instead of the whole collection, without taking ownership.
 \end{definition}
 
-\begin{verbatim}
+\begin{lstlisting}
     fn first_word(s: &String) -> usize {
     let bytes = s.as_bytes();
 
@@ -394,7 +434,7 @@ Note the scope of a reference starts when it introduced and ends when it's used 
 }
 
 fn main() {}
-\end{verbatim}
+\end{lstlisting}
 
 There are two problems with this, the return value of first\_word is not tied to the string.
 If we change the string, the value of the length of the first word doesn't change.
@@ -404,14 +444,14 @@ We have more values we must keep in sync.
 
 Let us use the string slice:
 
-\begin{verbatim}
+\begin{lstlisting}
     fn main() {
     let mut s = String::from("hello world");
 
-    let hello = &s[..5]; \\String Slices, tells us we want the value of the string from index 0 to 4
-    let world = &s[6..]; \\String Slices, tells us we want the value of the string from index 6 to 10
+    let hello = &s[..5]; //String Slices, tells us we want the value of the string from index 0 to 4
+    let world = &s[6..]; //String Slices, tells us we want the value of the string from index 6 to 10
     
-    let s2 = "hello word"; \\ String litteral are string slices!
+    let s2 = "hello word"; // String litteral are string slices!
 
     let word = first_word(s2);
 
@@ -429,14 +469,109 @@ Let us use the string slice:
     
 }
 
-\end{verbatim}
+\end{lstlisting}
 
 We can also create slice of array 
 
-\begin{verbatim}
+\begin{lstlisting}
     fn main(){
         let a = [1,2,3,4,5];
-        let slice = &a[0..2]; \\ This is of type &[i32]
+        let slice = &a[0..2]; // This is of type &[i32]
     }
-\end{verbatim}
+\end{lstlisting}
+
+\newpage
+
+\section{Structs}
+\subsection{Defining and Using Structs}
+\begin{lstlisting}
+//Defining a struct
+    struct User{ 
+    username: String,
+    email: String,
+    sign_in_count: u64,
+    active: bool,
+}
+
+fn main() {
+    //Creating an instance of struct
+    let mut user1 = User {
+        email: String::from("user@email.com"),
+        username: String::from("user123"),
+        active: true,
+        sign_in_count: 1
+    };
+    let name = user1.username; // Get values from struct with the . operator
+    user1.username = String::from("user234"); // modify specific values with . operator
+  
+    // Creating a new instance of struct with function
+    let user2 = build_user(
+        String::from("user345@email.com"),
+        String::from("user345")
+    );
+
+    //We can also create new instances of a struct using existing instances.
+
+    let user3 = User{
+        email: String::from("user456@email.com"),
+        username:String::from("user456"),
+        ..user2 // Takes the remaining field from user2
+    };
+
+    // We can also create structs without naming fields, these are called tuple structs
+
+    struct Colour(i32,i32,i32);
+    struct Point(i32,i32,i32);
+
+    // Colour and Point have the same fields, but have different type, 
+    //so we can't pass a Colour to a function that expects a Point.
+
+}
+
+fn build_user(email: String, username: String) -> User {
+    User{
+        email, // Since functions arguments have same name as field names, can write it like this...
+        username, //...This is called the field init shorthand syntax
+        active: true,
+        sign_in_count : 1,
+    }
+}
+\end{lstlisting}
+\newpage
+\subsection{Methods}
+\begin{lstlisting}
+#[derive(Debug)] // Needed to print out, we will look more into this later.
+struct Rectangle{
+    width: u32,
+    height: u32
+}
+
+// Creating implementation block for Rectangle struct,
+// This will house function and methodes associated with struct
+
+impl Rectangle{
+    fn area(&self) -> u32{ // First arguement in method is always self, the instance the method is being called on
+            self.width*self.height
+    }
+
+    fn can_hold(&self, other: &Rectangle) ->bool{
+        self.width > other.width && self.height>other.height
+    }
+}
+
+//Struct allow us to have multiple impl blocs
+
+// We can also def associated function, unlike methods they aren't tied to an instance of our struct.
+
+impl Rectangle{
+    fn square(size: u32) -> Rectangle{
+        Rectangle { 
+            width: size, 
+            height: size 
+        }
+    }
+\end{lstlisting}
+
+\section{Enums and Pattern matching}
+
 \end{document}
