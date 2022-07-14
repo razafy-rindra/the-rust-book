@@ -2,7 +2,11 @@
 \usepackage{fancyvrb, framed, verbatim}
 \usepackage{listings}
 \usepackage[T1]{fontenc}
-\definecolor{shadecolor}{rgb}{.9, .9, .9}
+\definecolor{shadecolor}{rgb}{.9, .9, .9}  %These were defined for when I used to use the verbatim environment, they are not used now normally.
+\newenvironment{code} %
+   {\snugshade\verbatim}%
+   {\endverbatim\endsnugshade}
+
 
 \lstset{ 
   language=C,
@@ -25,13 +29,10 @@
  % keywordstyle=\color{ForestGreen},       % keyword style
   upquote=true                     %Fixing the quotes
 }
-\pagecolor[rgb]{0.1,0.1,0.1}
-\color[rgb]{0,0.6,0}
 
+\pagecolor[rgb]{0.1,0.1,0.1} %page colour is frosted screen black
+\color[rgb]{0,0.6,0} %text colour is phosphor green
 
-\newenvironment{code}%
-   {\snugshade\verbatim}%
-   {\endverbatim\endsnugshade}
 
 
 \title{Rust Course notes}
@@ -573,5 +574,177 @@ impl Rectangle{
 \end{lstlisting}
 
 \section{Enums and Pattern matching}
+Structs and enums are the building blocks for creating new types in Rust. In Rust, enums are most similar to the ones from functional programming.
 
+\subsection{Defining Enums}
+Enums allow us to enumerate a list of variants. When is it appropriate to use enums over structs?
+
+\begin{example}
+    In this example we use enums to enumerate IP adresses, an IP adresse can be one of only two types, version 4 and version 6. So it is natural to use enums 
+if we want to express IP adresses in code.
+\newpage
+    \begin{lstlisting}
+enum IpAddrKind {
+    V4(u8, u8, u8, u8), // We can male this code more precise by adding data in the variant
+    V6(String),   // Enum variants can store different types of data
+}
+
+enum Message{
+    Quit,
+    Move {x: i32, y: i32},
+    Write(String),
+    ChangeColor(i32,i32,i32),
+}
+
+//Just like strucs we can define methods and associated functions on enum type.
+
+impl Message{
+    fn some_fn(){
+        println!("Ya-hoo");
+    }
+}
+
+
+struct  IpAddr{
+    kind: IpAddrKind,
+    address: String,
+}
+
+fn main() {
+    let four = IpAddrKind::V4;
+    let six = IpAddrKind::V6;
+
+    let localhost = IpAddrKind::V4(127,0,0,1);
+}
+
+//Since V4 and V6 are both variants of IpAddrKind, we can define a function that takes in
+//our enum type, and it can take in either V4 or V6
+
+fn route(ip_kind: IpAddrKind) {}
+    \end{lstlisting}
+\end{example}
+\subsection{Option Enum}
+Many languages have null values, a value can either exists or it is null (there is no value). But the type system cannot guarentee that if you use 
+a value it is not null.
+
+This is not a problem in Rust, since Rust has no null values. We use the option enum.
+
+\begin{lstlisting}
+fn main(){
+    /*  If we have a value that can possibly be null, we wrap it in the options enum.
+    enum Option<T>{
+        Some(T), //Some store any value
+        None, // None store no value
+    }
+    This forces the type system to enforce that we handle the None case and guarentees that a value exists in the Some case.*/
+       
+    let some_number = Some(5);
+    let some_string = Some("a string");
+
+    let absent_number: Option<i32> = None; // We need to annotate the type since no value is passed in so Rust can't infer the type.
+
+
+    let x: i8 = 5;
+    let y: Option<i8> = Some(5);
+
+    // let sum = x+y; This code gives an error, since we can't add i8 to an Option<i8>
+        
+
+    // In general we need to treat cases if Option is Some or None.
+
+    let sum =x+y.unwrap_or(0); // If y is Some it adds, if y is None it treats it as if it was 0.
+}
+\end{lstlisting}
+
+\subsection{Pattern Matching}
+
+Recall, match allows us to compare a value to a set of values. This is very useful for enums.
+
+\begin{lstlisting}
+    //Using Match Expressions
+
+fn main(){
+    value_in_cents(Coin::Quarter(UsState::Alaska));
+}
+
+#[derive(Debug)]
+enum UsState{
+    Alabama,
+    Alaska,
+    Arizona,
+    Arkansas,
+    California,
+    // ...
+}
+
+enum Coin{
+    Penny,
+    Nickel,
+    Dime,
+    Quarter(UsState),
+}
+
+fn value_in_cents(coin:Coin) -> u8{
+    match coin{
+        Coin::Penny => {
+            println!("Lucky penny!");
+            1
+        }
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter(state) => {
+            println!("State quarter from {:?}!", state);
+            25
+        }
+    }
+}
+\end{lstlisting}
+This program will output:\begin{verbatim}
+    State quarter from Alaska!
+\end{verbatim}
+
+\begin{lstlisting}
+    //Using Match Expressions with Option<T> enum
+
+fn main(){
+    let five = Some(5);
+    let six = plus_one(5);
+    let none = plus_one(None);
+}
+
+fn plus_one(x: Option<i32>) -> Option<i32>{
+    match x{
+        Some(i) => Some(i+1),
+        None => None 
+    }
+}
+/*
+Note Match expressions are exhaustive so we need to match all possible values. So if we 
+have a lot of types of values, we use the underscore placeholder.
+    match x{
+        Some(i) => Some(i+1),
+        _=> None // underscore means if it is any other pattern execute this code.
+    }
+*/
+\end{lstlisting}
+\subsection{Using if let syntax}
+\newpage
+\begin{lstlisting}
+    //Using if let syntax
+
+fn main(){
+    let some_value = Some(3);
+// Instead of using the match like this, when we only have on case we care about.    
+    match some_value{
+        Some(3) => println!("three"),
+        _=> (),
+    }
+
+// We can use the if-let synyax
+
+    if let Some(3) = some_value{ // Says if some_value matches with Some(3) execute the bellow code
+        println!("three");
+    }
+}
+\end{lstlisting}
 \end{document}
