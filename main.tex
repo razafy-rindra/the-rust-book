@@ -8,6 +8,7 @@
    {\endverbatim\endsnugshade}
 
 
+
 \lstset{ 
   language=C,
   backgroundcolor=\color[rgb]{0.1,0.1,0.1},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
@@ -747,4 +748,445 @@ fn main(){
     }
 }
 \end{lstlisting}
+
+\section{Module}
+In previous courses we have just been writting our code in one file, but now we are going to learn to be more organised, we will learn rust's Module system.
+\subsection{Packages and Crates}
+\begin{definition}
+    \textbf{Crates}:
+
+    When we type ``Cargo new'', Rust creates a new package containing crates, which contain modules.
+
+    Crates come in two flavours:\begin{itemize}
+        \item Binary crate: Code you can execute
+        \item Library crate: Code that can be used by other programs.
+    \end{itemize}
+\end{definition}
+
+Convention:
+If we have ``main.rs'' file in the src directory then a binary crate with the same name as package will be automatically created and main.rs will be the crate root.
+
+\begin{definition}
+    \textbf{Crate root}
+
+    Is the source file that rust compiler starts at when building our crate.
+\end{definition}
+
+If we have ``lib.rs'' file in the src directory then a library crate with the same name as package will be automatically created and lib.rs will be the crate root.
+
+\paragraph*{Rules around crates}
+\begin{itemize}
+    \item A package must have at least one crate
+    \item A package can have either 0 or 1 library crate
+    \item A package can have any number binary crate.
+\end{itemize}
+
+If want to make more binary crates, make a folder called bin, each file in that folder will represent another binary crate.
+
+
+\subsection{Defining Modules}
+\newpage
+\subsubsection{Definintions, Paths and Privacy}
+\begin{lstlisting}
+    //Our goal is to create library that helps run a restaurant.
+
+    //We seperate the restaurant in two parts, the front of the house is where the customers are
+    //Back of the house is where food is being made, dishes are clean and where manager is.
+
+    mod front_of_house { // module are specified with mod keyword
+    // In side this module we have two other modules, modules can contain other modules, structs, enums, constants, traits, etc...
+    
+    pub mod hosting { //By default a child module and anything inside of it is private from the point of view of parent module.  
+    // So need to put the "pub" keyword, so that front_of_house can see hosting and it's contents.
+        pub fn add_to_waitlist() {}
+
+            fn seat_at_table() {}
+        }
+
+        mod serving {
+            fn take_order() {}
+
+            fn serve_order() {}
+
+            fn take_payment() {}
+        }
+    }
+
+
+    // If you want to reference an item in module tree (like a funciton), need to specifyt a path to function
+    pub fn eat_at_restaurant(){
+        // Absolute path
+        crate::front_of_house::hosting::add_to_waitlist();
+
+        //Relative path, start from the current module
+        front_of_house::hosting::add_to_waitlist();
+
+    }
+
+    fn serve_order(){}
+
+    mod back_of_house{
+        fn fix_incorrect_order(){
+            cook_order();
+            super::serve_order(); // super:: allows us to reference the parent module, in this case crate.
+        }
+
+        fn cook_order() {}
+    }
+\end{lstlisting}
+\newpage 
+
+\subsection{Privacy rules when it comes to structs}
+
+\begin{lstlisting}
+    //Privacy rules when it comes to structs
+
+    mod back_of_house {
+        pub struct Breakfast { // Need to pub keyword to access it.
+        pub toast: String, // Even though struct is pub, by default fields are private 
+        seasonal_fruit: String,
+        }
+
+        impl Breakfast {
+            pub fn summer(toast: &str) -> Breakfast {
+                Breakfast {
+                    toast: String::from(toast),
+                    seasonal_fruit: String::from("peaches"),
+                }
+            }
+        }
+    }
+
+    pub fn eat_at_restaurant() {
+        let mut meal = 
+            back_of_house::Breakfast::summer("Rye");
+        
+        meal.toast = String::from("Wheat");
+        
+        // Note we need to use summer function to make Breakfast struct.
+        // We can't create one directly, since it contains a private field, seasonal_fruit.
+
+        /*
+        This gives us an error 
+        
+        let meal2 = back_of_house::Breakfast{
+            toast: String::from("Wheat"),
+            seasonal_fruit: String::from("peaches")
+        };
+        */
+    }
+\end{lstlisting}
+
+\newpage
+\subsubsection{Privacy rules when it comes to enums}
+
+\begin{lstlisting}
+    mod back_of_house {
+    pub enum Appetizer { 
+        Soup, // By default if an enum is public so are it's variants.
+        Salad,
+    }
+}
+
+pub fn eat_at_restaurant() {
+    let order1 = back_of_house::Appetizer::Soup;
+    let order2 = back_of_house::Appetizer::Salad;
+}
+\end{lstlisting}
+
+\newpage
+\subsubsection{Use keyword}
+\paragraph*{Bringing paths into scope with the use keyword.}
+
+\begin{lstlisting}
+    mod front_of_house {
+    pub mod hosting {
+        pub fn add_to_waitlist() {}
+    }
+}
+
+// In order to not have to specify the whole path to add_to_waitlist each time we call it, we can use the "use" keyword to bring a path in to scope.
+
+// use self::front_of_house::hosting; relative path with "self" referenceing the current module 
+
+pub use crate::front_of_house::hosting; // If we want code that is external to this file to reference hosting::, we need to mark this "pub"
+
+
+pub fn eat_at_restaurant() {
+    let secret_number = rand::thread_rng().gen_range(1, 101);
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+}
+
+
+
+
+/*  Could have brought the funtion into scope to not have to use hosting::
+ But in Rust the idiomatic way to bring a function into scope is to bring it's parent module into scope
+ In order to make it clear that add_to_waitlist() function is not a local function.
+
+ If we are bringing enums, struct, other items into scope then we specify the whole path. Except if we are bringing two items with the same name into scope.
+
+For example here:
+
+
+use std::fmt;
+use std::io;
+
+fn function1() -> fmt::Result {
+    // --snip--
+    Ok(())
+}
+
+fn function2() -> io::Result<()> {
+    // --snip--
+    Ok(())
+}
+
+Another way of doing this is to rename our function:
+
+use std::fmt::Result;
+use std::io::Result as IoResult;
+
+fn function1() -> Result {
+    // --snip--
+    Ok(())
+}
+
+fn function2() -> IoResult<()> {
+    // --snip--
+    Ok(())
+}
+*/
+\end{lstlisting}
+\newpage 
+\paragraph*{Using external packages}
+\begin{lstlisting}
+    //Use keyword
+
+    /*Instead of this:
+    use rand::Rng;
+    use rand::CryptoRng;
+    use rand::ErrorKind::Transient;
+    We can do this:
+    */
+    
+    use rand::{Rng, CryptoRng, ErrorKind::Transient}; // Nested paths
+    
+     
+    /*
+    Instead of this:
+    use std::io
+    use std::io::Write
+    
+    We can do this:
+    
+    */
+    
+    use std::io::{self, Write};
+    
+    
+    //Glob operator:
+    // use std::io::* this means all public items underneath io are in scope.     
+\end{lstlisting}
+
+\newpage
+\subsubsection{Modules in sperate files}
+In order to make our code cleaner we can move our module definitions in different files:
+\begin{lstlisting}
+// In src/lib.rs
+mod front_of_house; // This tells Rust, define our module here but get the contents from a different file with the same name as our module.
+
+
+pub use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+    hosting::add_to_waitlist();
+}
+\end{lstlisting}
+
+\begin{lstlisting}
+//In src/front_of_house.rs
+
+    pub mod hosting;
+\end{lstlisting}
+
+\begin{lstlisting}
+// In src/front_of_house/hosting.rs
+
+    pub fn add_to_waitlist() {} // Needs to live in a directory with the same name as parent module.        
+\end{lstlisting}
+
+\section{Common Collections}
+\begin{definition}
+    \textbf{Collection}
+These are some useful data structures included in the standard library.
+
+\
+
+Unlike arrays and tuples, collections are allocated on the heap so their size can grow or shrink as needed.
+\end{definition}
+
+In this section we will talk about vectors, strings and hashmaps.
+
+\subsection{Vectors}
+\begin{lstlisting}
+    fn main() {
+//Vectors
+    let a = [1,2,3];
+    let mut v:Vec<i32> = Vec::new(); //Vectors can hold any values, so we need to specify the type.
+    v.push(1); // Vectors can grow in size, we can add eleements to it with .push()
+    v.push(2);
+    v.push(3);
+
+    {
+        let v2 = vec![1,2,3]; // Can create a vector with initial values like this.
+    }// When our scope ends, v2 and all elements in it are dropped.
+
+//Acessing elemetents in vectors
+
+    let mut v = vec![1,2,3,4,5];
+
+    let third = &v[2];
+    //  v.push(6);  Error since v is borred as immutable on previous line. If we have an immutable reference to something we expect the underlying value to not change. But if we take a mutable reference to the same thing, the underlying value could change.
+    // When we push an element to a vector, we may need to allocated more memory for the new element, so we would move all elements in vector to new location, and our element at the previous line will be pointing to something else.
+    println!("The third element is {}", third);
+
+    // If we try to run with third = &v[20], we will get a runtime error, unlike with arrays, we don't get a compile time error. Since at compile time we don't know the size of vector. 
+
+    //If we want to access data gracefully, so that the program doesn't crash at runtime if an invalid index is used.
+
+    match v.get(20) {
+        Some(third) => println!("The third element is {}", third),
+        None => println!("There is no third element."),
+    }
+
+//Iterating over vector.
+
+    for i in &mut v{ // for loop
+        *i += 50; // Derefencing operator
+        println!("{}", i);
+    }
+
+// Storing enum variables
+
+    enum SpreadsheetCell {
+        Int(i32),
+        Float(f64),
+        Text(String),
+    }
+
+    let row = vec![
+        SpreadsheetCell::Int(3),
+        SpreadsheetCell::Text(String::from("blue")),
+        SpreadsheetCell::Float(10.12),
+    ];
+
+    match &row[1] {
+        SpreadsheetCell::Int(i) => println!("{}", i),
+        _=> println!("Not an integer!")
+    };
+}
+\end{lstlisting}
+
+\subsection{String}
+
+In higher programming languages, the complexity of strings is abstracted away from the programmer. In lower programming languages, like in Rust, we have to deal with 
+that complexity.
+
+\begin{definition}
+    \textbf{Strings} are stored as a collection of UTF-8 encoded bytes. 
+\end{definition}
+
+What is UTF-8 encoding? We first need to understand ASCII, it is an string encoding. It defines how to take $10's$ and turn them into strings and vice-versa.
+
+Each ASCII character is stored as a byte, and only 7-bits of that byte is used to represent a character. So only 128 unique characters.
+It only represents the english alphabet, some special characters and commands.
+
+\
+
+So other countries came up with their own standards to encode characters. So how does a program know what standard to use when interpratating a collection of bytes.
+
+So unicode was created was used to solve this problem. Unicode represent characters from a lot of languages, and other characters like emojis. It is also backwards compatible with ASCII.
+
+\begin{definition}
+    \textbf{UTF-8} is a ``variable-width'' character encoding. Each character in UFT-8 can be represented by 1 byte, 2 bytes, 2 bytes or 4 bytes. 
+\end{definition}
+
+\paragraph*{Three relevant ways a string is represented in unicode.}
+
+
+\begin{itemize}
+    \item bytes
+    \item Scalar values, can think about these as building blocks of characters (this is what the char type refers to). They can be characters or parts of characters.
+    \item Grapheme clusters, what we usually mean when we say characters, the glyphs that build up a word. 
+\end{itemize}
+
+The problem with indexing into a string Rust doesn't know what value we want to recieve. Bytes, scalaing values or grapheme clusters.
+
+Look at the /collection-strings folder to see the code.
+
+\subsection{Hash maps}
+
+\begin{definition}
+    \textbf{Hash maps} allow us to store key-value pairs and uses a hashing function to determine how to place the keys and values.
+\end{definition}
+
+\begin{lstlisting}
+    use std::collections::HashMap;
+
+fn main() {
+    let blue = String::from("Blue");
+    let yellow = String::from("Yellow");
+
+    let mut scores = HashMap::new();
+
+    scores.insert(blue, 10); //Note we are not passing the strings as references, so we transfer ownership into the hashmap
+    scores.insert(yellow,50);
+
+    let team_name = String::from("Blue");
+    let score = scores.get(&team_name); //Get method takes a reference to a key and gives us an option, since we can't guarentee a value will be returned, if we pass an invalide key it will return None.
+
+    for (key, value) in &scores{
+        println!("{}: {}", key, value);
+    }
+
+    println!("-------");
+
+// Updating our Hashmap
+
+    scores.insert(String::from("Blue"), 20); // Overwrites the Blue key with the value 20.
+
+    //If we don't run to overwrite the existing values:
+
+    scores.entry(String::from("Green")).or_insert(30); //If there isn't entry for key insert key with value 30 unless do nothing.
+    scores.entry(String::from("Green")).or_insert(40); //Nothing happens here.
+
+    for (key, value) in &scores{
+        println!("{}: {}", key, value);
+    }
+    
+    println!("---");
+
+// Updating values based on old value
+
+    let text = "hello world wonderful world";
+    // value is how many times the key appears in the string.
+    let mut map = HashMap::new();
+
+
+    //["hello", "world", "wonderful", "word"]
+    for word in text.split_whitespace() { //Splits up the string by the whitespace
+        let count = map.entry(word).or_insert(0); // .entry retirns an enum representing the value at that key. If the word doesn't exists it adds it to the hashmap and initialises the value to 0. If it does exists it doesn't do anything.
+        *count += 1; //or_insert returns a mutable reference to our value, so we can deincrement it and add 1, even if it doesn't do anything sine the key already exists.
+    }
+
+    println!("{:?}", map);
+
+}
+\end{lstlisting}
+
 \end{document}
