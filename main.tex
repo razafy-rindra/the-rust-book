@@ -1440,4 +1440,192 @@ We may also use unwrap or expect in prototype code, in order to get code out qui
 We may also use expect or unwrap in test code.
 
 Lastly, we may use expect or unwrap when we know a call to function will succeed.
+
+\section{Generics}
+In the next three sections we will be covering generics, traits and lifetimes. These are all ways to reduce code duplication.
+
+\subsection{A first example}
+
+Say we have a list of numbers and we want to find the largest element, then naively we can write it like this:\begin{lstlisting}
+    fn main() {
+    let number_list = vec![34, 50, 25, 100, 65];
+
+    let mut largest = number_list[0];
+
+    for number in number_list {
+        if number > largest {
+            largest = number;
+        }
+    }
+
+    println!("The largest number is {}", largest); // prints 100
+}
+\end{lstlisting}
+
+The problem with this code is that if we want to find the largest element of another function, we will have to rewrite the for loop again. An easy fix to this is to put the logic used to find the largest number into another function:
+\newpage
+\begin{lstlisting}
+    fn main() {
+    let number_list = vec![34, 50, 25, 100, 65];
+
+    let largest = get_largest(number_list); //Returns 100
+
+    println!("The largest number is {}", largest); 
+
+    let number_list = vec![102, 34, 6000, 89, 54, 2, 43, 8];
+
+    let largest = get_largest(number_list); //Returns 6000
+    
+    println!("The largest number is {}", largest); 
+}
+
+
+fn get_largest(number_list: Vec<i32>) -> i32{
+    let mut largest = number_list[0];
+    for number in number_list {
+        if number > largest {
+            largest = number;
+        }
+    }
+    largest
+}
+\end{lstlisting}
+
+But what if we want to use the same logic as in our get\_largest function over a slightly different set of arguments. Let say we are looking for the largest character in a vector.
+
+We can use ``generics'' to modify our get\_largest function to be able to take in both a Vec<i32> and Vec<char>
+
+
+\paragraph*{Using generics to generalise our function}
+\begin{lstlisting}
+    fn main() {
+    let number_list = vec![34, 50, 25, 100, 65];
+
+    let largest = get_largest(number_list); //Returns 100
+
+    println!("The largest number is {}", largest);
+
+    let char_list = vec!['y', 'm', 'a', 'q'];
+
+    let largest = get_largest(char_list); //Returns 'y'
+    
+    println!("The largest character is {}", largest);
+}
+
+
+fn get_largest<T: PartialOrd + Copy>(list: Vec<T>) -> T{ // Generic types are specified in <> after the function name
+    let mut largest = list[0];
+    for element in list {
+        if element > largest {
+            largest = element;
+        }
+    }
+    largest
+}
+\end{lstlisting}
+\begin{remark}
+    PartialOrd and Copy are traits. We need to specify them to restrict our function to only accepting types that can be ordered and copied (like ints or char).
+
+    We will talk more about traits in next section.
+\end{remark}
+
+\paragraph*{Generic Types in Structs}
+\begin{lstlisting}
+    struct Point<T, U>{
+    x: T,
+    y: U, // If we only used one generic, then both x and y would have to be of the same type T
+}
+
+
+fn main() {
+    let p1 = Point{x:5, y:10}; // Can pass in two i32
+    let p2 = Point{x:5.0, y:10.0}; // Can pass in two f64
+    let p3 = Point {x: 5, y:10.0}; // Or can pass in one i32 and one f64 (where i32-> T and f64->U)
+}
+\end{lstlisting}
+
+We can also use generics in enums, recall the Option and Result enum are implemented using generics.
+
+\begin{lstlisting}
+    fn main(){
+        enum Option<T>{ // Use only one generic
+            Some(T),
+            None,
+        }
+
+        enum Result<T,E>{ // Two generics, T and E
+            Ok(T),
+            Err(E),
+        }
+    }
+\end{lstlisting}
+
+\paragraph*{Genercis in Method Definitions}
+\begin{lstlisting}
+    struct  Point<T>{
+    x: T,
+    y: T,
+}
+
+
+impl<U> Point<U> { // Note we don't need to use the same name, implentation uses a generic and calls it U.
+    fn x(&self) -> &U{
+        &self.x
+    }
+}
+
+impl Point<f64> { // Here the method is only defined for Points that have a type parameter of f64
+    fn y(&self) -> f64{
+        self.y
+    }
+}
+
+
+fn main(){
+    let p = Point {x:5, y:10}; // x() is avaliable as a method but not y()
+    let p1 = Point {x: 5.0, y:10.0}; // both x() and y() are available.
+}
+\end{lstlisting}
+
+\paragraph*{A more complex example}
+\begin{lstlisting}
+    struct  Point<T, U>{
+    x: T,
+    y: U,
+}
+
+
+impl<T, U> Point<T, U> {
+    fn mixup<V,W>(self, other: Point<V,W>) -> Point<T,W>{
+        Point{
+            x: self.x,
+            y: other.y,
+        }
+    }
+}
+
+
+fn main(){
+    let p1 = Point{x: 5, y:10.4};
+    let p2 = Point{x:"Hello", y: 'c'};
+
+    let p3 = p1.mixup(p2);
+
+    println!("p3.x = {}, p3.y = {}", p3.x, p3.y); // p3.x = 5, p3.y = c
+}
+\end{lstlisting}
+
+Finally let us talk about performance, generics allow us to reduce duplication without incuring a performance hit:\begin{lstlisting}
+    enum Option<T>{
+        Some(T),
+        None,
+    }
+
+    fn main(){
+        let integer = Option::Some(5);
+        let float = Option::Some(5.0);
+    }
+\end{lstlisting}
+ At compile time Rust will turn the Option enum into two enums one for i32 and one for f64
+
 \end{document}
