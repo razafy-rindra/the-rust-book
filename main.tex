@@ -1031,7 +1031,7 @@ Unlike arrays and tuples, collections are allocated on the heap so their size ca
 \end{definition}
 
 In this section we will talk about vectors, strings and hashmaps.
-
+\newpage
 \subsection{Vectors}
 \begin{lstlisting}
     fn main() {
@@ -1134,7 +1134,7 @@ Look at the /collection-strings folder to see the code.
 \begin{definition}
     \textbf{Hash maps} allow us to store key-value pairs and uses a hashing function to determine how to place the keys and values.
 \end{definition}
-
+\newpage
 \begin{lstlisting}
     use std::collections::HashMap;
 
@@ -1189,4 +1189,255 @@ fn main() {
 }
 \end{lstlisting}
 
+\section{Error handling}
+
+\subsection{Panic!}
+If program fails in an unrecoverable way we can use panic! macro that quits the program and returns an error message.
+
+\begin{lstlisting}
+    fn main() {
+    panic!("crash and burn");
+}
+\end{lstlisting}
+
+This will return \begin{lstlisting}
+    thread 'main' panicked at 'crash and burn', src/main.rs:3:5
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+\end{lstlisting}
+
+Note if we have a function that sends out a panic! if given some bad inputs, but we have multiple functions that can call this function. If our program panics!, we don't know 
+from where the error is comming from. To resolve this problem we use backtrace. 
+Like so:
+
+\paragraph*{Code with error}
+\begin{lstlisting}
+    fn main() {
+    a();
+}
+
+fn a(){
+    b();
+}
+
+fn b(){
+    c(22);
+}
+
+fn c(num: i32){
+    if num == 22{
+        panic!("Do not pass in 22!");
+    }
+}
+\end{lstlisting}
+
+\paragraph*{Running it with backtrace to see where we have the bad function call}
+\begin{lstlisting}
+    RUST_BACKTRACE=1 cargo run
+    Finished dev [unoptimized + debuginfo] target(s) in 0.00s
+     Running `target/debug/errors`
+thread 'main' panicked at 'Do not pass in 22!', src/main.rs:15:9
+stack backtrace:
+   0: rust_begin_unwind
+             at /rustc/a8314ef7d0ec7b75c336af2c9857bfaf43002bfc/library/std/src/panicking.rs:584:5
+   1: core::panicking::panic_fmt
+             at /rustc/a8314ef7d0ec7b75c336af2c9857bfaf43002bfc/library/core/src/panicking.rs:142:14
+   2: errors::c
+             at ./src/main.rs:15:9
+   3: errors::b // c is being called by b
+             at ./src/main.rs:10:5
+   4: errors::a // b is being called by a 
+             at ./src/main.rs:6:5
+   5: errors::main
+             at ./src/main.rs:2:5
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/a8314ef7d0ec7b75c336af2c9857bfaf43002bfc/library/core/src/ops/function.rs:248:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+\end{lstlisting}
+
+\subsection{Result Enum}
+Let's talk with recoverable errors, that we can handle gracefully without crashing. 
+
+We have the ``Result'' Enum, like the options Enum it contains two variable, but in this case they represent success and failure:\begin{lstlisting}
+    enum Result<T,E>{
+        Ok(T), // represents success
+        Err(E), // represents failure
+    }
+\end{lstlisting}
+\newpage
+\paragraph*{An example, using the result enum to deal with errors opening files}
+\begin{lstlisting}
+    use std::fs::File;
+    use std::io::ErrorKind; //Let us match on the type of error we get
+
+fn main(){
+    let f = File::open("hello.txt"); //Returns an Result Enum
+
+    let f = match f{  //Need to resolve what we do with the different enum variables
+        Ok(file) =>file, // Assign the file to f
+        Err(error) => match error.kind(){ // If there is an error match based on the kind of error
+                ErrorKind::NotFound => match File::create("hello.txt"){ // If file doesn't exists create the file
+                    Ok(fc) => fc, // If no error we can create the file
+                    Err(e) => panic!("Problem creating the file: {:?}", e) // If there is error panic!
+                },
+                other_error=>{ // If we get an error not of the file not found kind panic!
+                    panic!("Problem opening the file: {:?}", other_error)
+                }
+        }
+    };
+
+// Another way to write this code using closures. More about this in chapter 13
+
+    let f = File::open("hello.txt").unwrap_or_else(|error| { // This will give us back the file or call this anonymous function, aka closure |error|{...}
+        if error.kind() == ErrorKind::NotFound {
+            File::create("hello.txt").unwrap_or_else(|error| {
+                panic!("Problem creating the file: {:?}", error);
+            })
+        } else {
+            panic!("Problem opening the file: {:?}", error);
+        }
+    });
+}
+\end{lstlisting}
+
+\paragraph*{Useful functions on the Result enum}
+\begin{lstlisting}
+    use std::fs::File;
+
+fn main(){
+//  let f = File::open("new_hello.txt").unwrap(); 
+
+    let f = File::open("new_hello.txt").expect("Failed to open new_hello.txt"); 
+
+
+//we can use unwrap() to do the same this as the below match expression. 
+//we can use the expect() method, if we also want to specify the error message that is passed when we panic!
+
+    /*
+        let f = match f{
+            Ok(file) => file,
+            Err(error) => panic!("Problem opening file: {:?}", error),
+        };
+    */
+}
+\end{lstlisting}
+
+\subsection{Error propagation}
+
+\begin{definition}
+    When we have a function whose implementation calls something that can fail, we often want to return that error back to the caller instead of handling it in the function.
+
+    This is called \textbf{error propagation}        
+\end{definition}
+\newpage
+\paragraph*{A first attempt at dealing with errors with error propagation}
+\begin{lstlisting}   
+#![allow(unused)]
+
+use std::fs::File;
+use std::io::{self, Read};
+fn read_username_from_file() -> Result<String, io::Error> {
+    let f = File::open("hello.txt");
+
+     let mut f = match f {
+         Ok(file) => file, //If opening the file succeds we take that file and store it in f
+         Err(e) => return Err(e), // If opening the file fails we take the error and return it
+     };
+
+    let mut s = String::new(); 
+
+     match f.read_to_string(&mut s) { // Read the contents of the file and store it in the string
+         Ok(_) => Ok(s), 
+         Err(e) => Err(e),
+     } //read_to_string returns a result type, if we have success we return the string in error we return error.
+
+    }
+    fn main() {}
+\end{lstlisting}
+
+\paragraph*{A cleaner way to use error propagation, with the ? operator}
+\begin{lstlisting}
+    
+#![allow(unused)]
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut f = File::open("hello.txt")?; //The ? operator says, if we succed in opening the file the file is returned and stored in f, if we fail it reurns error
+    let mut s = String::new(); 
+
+    f.read_to_string(&mut s)?; // If this call fails, the function will return error
+    Ok(s) //If we get to this line, read_to_string succeeded so we return the string
+}
+fn main() {}
+\end{lstlisting}
+This code gives us the same output as in the previous screen.
+
+
+\paragraph*{Reducing our codes to three lines}
+\begin{lstlisting}   
+
+#![allow(unused)]
+use std::fs::File;
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut s = String::new();
+    File::open("hello.txt")?.read_to_string(&mut s)?;
+    Ok(s) 
+}
+fn main() {}
+\end{lstlisting}
+
+Can our code get simpler? Yes, we can reduce it to one line by bringing fs into scope
+\paragraph*{Ultimate implematation}
+\begin{lstlisting}
+
+#![allow(unused)]
+use std::fs::{self, File};
+use std::io::{self, Read};
+
+fn read_username_from_file() -> Result<String, io::Error> {
+    fs::read_to_string("hello.txt")
+}
+
+fn main() {}
+\end{lstlisting}
+
+What happens if we try to use our ? operator in the main function? Since our main function doesn't return anything we get an error:
+
+\begin{lstlisting}
+
+fn main(){
+    let f = File::open("hello.txt")?; // Error message: the `?` operator can only be used in a function that returns `Result` or `Option`
+\end{lstlisting}
+
+In order to fix this, we can let main() return a result type.
+
+\paragraph*{Fixing our code by making main() return Result}
+\begin{lstlisting}
+    #![allow(unused)]
+    use std::error::Error;
+    use std::fs::File;
+    
+    fn main() -> Result<(), Box<dyn Error>>{ //In the error case we return a "Trait" object, which we will talk about in chap 17 
+        let f = File::open("hello.txt")?;
+    
+        Ok(())
+    
+    }
+\end{lstlisting}
+
+\paragraph*{When should we be using the Result enum and the panic! macro?}
+
+In general we should in default use the Result enum, this prevents the program from crashing, and error propagation, which let's the caller decide what to do with the error.
+
+We should only use the panic! macro in exceptional circumstances, for example circumstances where recovering from the error is impossible or recovering from that state is impossible.
+
+Another appropriate place to allow our code to panic! is in example code. We can use methods like unwrap or expect for brevity, and since there is no context for determinaning with how to deal with errors.
+
+We may also use unwrap or expect in prototype code, in order to get code out quickely in order to test it and then introduce error handling after.
+
+We may also use expect or unwrap in test code.
+
+Lastly, we may use expect or unwrap when we know a call to function will succeed.
 \end{document}
