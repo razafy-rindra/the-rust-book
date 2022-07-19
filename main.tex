@@ -1614,7 +1614,7 @@ fn main(){
     println!("p3.x = {}, p3.y = {}", p3.x, p3.y); // p3.x = 5, p3.y = c
 }
 \end{lstlisting}
-
+\newpage
 Finally let us talk about performance, generics allow us to reduce duplication without incuring a performance hit:\begin{lstlisting}
     enum Option<T>{
         Some(T),
@@ -1627,5 +1627,212 @@ Finally let us talk about performance, generics allow us to reduce duplication w
     }
 \end{lstlisting}
  At compile time Rust will turn the Option enum into two enums one for i32 and one for f64
+ \newpage
+ \section{Traits}
+
+\begin{definition}
+    \textbf{Traits} allow us to define a set methods that are shared across different types. 
+\end{definition}
+\subsection{Implementations}
+\paragraph*{How are Traits implemented?}\begin{lstlisting}
+use std::iter::Sum;
+pub struct NewsArticle {
+    pub headline: String,
+    pub author: String,
+    pub content: String,
+}
+
+ impl Summary for NewsArticle{
+    fn summarize_author(&self) -> String { 
+        format!("{}", self.author) 
+    }
+    // Don't need to implement summarize since we will use the default implematation.
+ }
+
+pub struct Tweet{
+    pub username: String,
+    pub content: String, 
+    pub reply: bool,
+    pub retweet: bool,
+}
+
+impl Summary for Tweet{
+    fn summarize_author(&self) -> String {// We need to implement summarize_author since the function has no default implementation. 
+        format!("@{}", self.username) 
+    }
+
+    fn summarize(&self) -> String {
+        format!("{}: {}", self.username, self.content)
+    }
+}
+
+pub trait Summary{ //Defines a shared methods for our types
+    fn summarize_author(&self) -> String;
+    
+    fn summarize(&self) -> String{
+        format!("(Read more from {}...)", self.summarize_author()) //Default implementation, if our struct doesn't implement this function it will use this implementation
+    }
+}
+fn main(){
+    let tweet = Tweet{
+        username: String::from("@user"),
+        content: String::from("Hello world"),
+        reply: false,
+        retweet: false
+    };
+    let article = NewsArticle{
+        author: String::from("The Author"),
+        headline: String::from("I wrote an article!"),
+        content: String::from("This is my article")
+    };
+    println!("Tweet summary: {}", tweet.summarize()); 
+    println!("Article summary: {}", article.summarize()); 
+}
+\end{lstlisting}
+
+\paragraph*{This code outputs}\begin{lstlisting}
+    Tweet summary: @user: Hello world
+Article summary: (Read more from The Author...)
+\end{lstlisting}
+
+\newpage
+\subsection{Trait Bounds}
+\paragraph*{\&impl syntax and trait bound}\begin{lstlisting}
+    // Put in previous Implementations of Tweet, NewsArticle, Summary are to be put here
+
+    pub fn notify(item: &impl Summary){ // This function takes in a reference to something that implements summary
+        println!("Breaking news! {}", item.summarize());
+    }
+   
+
+    fn main(){
+        \\ Put in the previous defintions of tweet and article
+        notify(&article);
+    }
+\end{lstlisting}
+\paragraph*{This code outputs}\begin{lstlisting}
+    Breaking news! (Read more from The Author...)
+\end{lstlisting}
+This above \&impl syntax is syntax sugar for what is called a ``trait bound'' which looks like this:
+
+\paragraph*{Trait Bound}\begin{lstlisting}
+    
+    // Put in previous Implementations of Tweet, NewsArticle, Summary are to be put here
+    pub fn notify<T:Summary>(item: &T){ // Generic that is limited to something that interprets a Summary trait.
+        println!("Breaking news! {}", item.summarize());
+ } // Does the same as the &impl syntax 
+\end{lstlisting}
+
+This syntax is useful if we want our function to take in multiple inputs of the same type:
+\paragraph*{Multiple inputs}\begin{lstlisting}
+    pub fn notify(item1: &impl Summary, item2: &impl Summary){ // Here item1 and item2 can be anything that implements Summary, but they can also be different from eachother.
+        //...
+}
+
+     pub fn notify<T:Summary>(item1: &T, item2: &T){ // item1 and item2 are both of the same type &T which can be anything that implements Summary. 
+         //...
+}
+\end{lstlisting}
+
+
+\paragraph*{Specifying multiple traits and the where clause}\begin{lstlisting}  
+   // impl syntax:
+   
+   
+   pub fn notify(item1: &(impl Summary + Display), item2: &impl: Summary){ //item1 is anything that implements both Summary and Display, while item2 is anything that implements Summary
+        //...
+ }
+   
+   // //Trait bound syntax
+   
+ pub fn notify<T:Summary+Display>(item1: &T, item2: &T){
+        //....
+}
+   
+   // Specifying multiple trait bounds can hinder readablity, for example:
+   
+fn some_function<T:Display+Clone, U: Clone + Debug>(t:&T, u:&U) ->i32{....}
+   
+   
+   // To make it more readible we can use the "where"-clause
+   
+fn some_function<T,U>(t:&T,u:&U) ->i32
+        where T:Display+Clone,
+              U: Clone+Debug
+    {
+       ///..
+   }
+   
+\end{lstlisting}
+
+\paragraph*{Trait bounds to conditionally implement methods}\begin{lstlisting}
+    struct Pair<T>{
+         x: T,
+         y: T,
+}
+    
+     impl<T> Pair<T>{ //This implementation block is for any pair struct.
+         fn new(x: T, y: T) -> Self{ // Every pair struct will have this method
+             Self {x,y}
+         }
+ }
+    
+     impl<T: Display + PartialOrd> Pair<T>{ // We use trait bounds to say that T has to implement display and partial order
+         fn cmp_display(&self){ // only the struct that, where T implement display and partial order will have this function
+             if self.x >= self.y{
+                 println!("The largest member is x = {}", self.x);
+             } else{
+                 println!("The largest member is y = {}", self.y);
+             }
+         }
+     }
+    
+    
+\end{lstlisting}    
+\paragraph*{Blanket implementation}\begin{lstlisting}
+    
+    // We can implement a trait on a type that implements another strait
+    
+     impl<T:Display> ToString for T{ // We implement the ToString trait on any type that implement Display
+         //
+     } // We will talk about this later.
+\end{lstlisting}
+\subsection{Return types}
+Now let us talk about return types.
+\begin{lstlisting}
+    // Put in previous Implementations of Tweet, NewsArticle, Summary are to be put here
+
+fn returns_summarizable() -> impl Summary  {//We return any type that implements the summary trait
+    Tweet {
+        username: String::from("horse_ebooks"),
+        content: String::from(
+            "of course, as you probably already know, people",
+        ),
+        reply: false,
+        retweet: false,
+    }
+} // This is very useful with closures and iterators which we will learn more about later.
+
+// While this function can return any type that implements Summary it has it's limits.  While we can return any type implementing Summary, we can only return one type at a time.
+
+ fn return_bool(switch: bool) ->impl Summary{ // This code does not compile.
+     if switch{
+         NewsArticle{
+             ///
+         }
+     } else{
+         Tweet{
+             ///
+         }
+     }
+}
+
+fn main(){
+    println!("{}", returns_summarizable().summarize());
+}
+\end{lstlisting}
+\paragraph*{This code outputs}\begin{lstlisting}
+    horse_ebooks: of course, as you probably already know, people
+\end{lstlisting}
 
 \end{document}
