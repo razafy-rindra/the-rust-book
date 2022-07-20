@@ -1835,4 +1835,419 @@ fn main(){
     horse_ebooks: of course, as you probably already know, people
 \end{lstlisting}
 
+
+
+\section{Lifetimes}
+\begin{definition}
+    \textbf{A dangling reference} is a reference that points to invalid data. Rust does not like dangling references.
+\end{definition}
+\paragraph*{Dangling referece}\begin{lstlisting}
+    fn main() {
+    let r;          //--------------+----'a, lifetime of r denoted by 'a
+    {                          //   |
+        let x = 5; //--+--'b,       |        lifetime of x denoted by 'b
+        r = &x;    //--|            |
+    }              //--+            |          x dies here.
+                                //  |         
+    println!("r: {}", r);         //|
+}                                   +        r dies here 
+\end{lstlisting}
+r is a dangling reference, since it is referencing x which was invalidated after it went out of scope.
+Rust doesn't let this code complie. It knows at compile that $x$ doesn't live long enough for us to reference it because of the borrow-checker.
+
+
+\begin{lstlisting}
+    fn main() {
+    
+        let x = 5;          // -------------------+--'b
+        let r = &x;         //--+--'a             |
+    println!("r: {}", r);   //  |                 |
+}                           //--+-----------------+
+\end{lstlisting}
+
+When we print $r$ here, $r$ is referencing $x$ whose lifetime is valid at that point, so we don't get any error.
+
+The bottow-checker is able to figure all this out without help. Now we will talk about situations where we do need to help the compliler.
+
+\subsection{Genreric Lifetime annotations}
+
+\paragraph*{Problematic code}\begin{lstlisting}
+    fn main() {
+    let string1=String::from("abcd");
+    let string2 = String::from("xyz");
+
+    let result = longest(string1.as_str(), string2.as_str());
+    println!("The longest string is {}", result); // As the borrow checker how would we know that result is not dangling reference?
+
+    fn longest(x:&str, y:&str) -> &str{
+        if x.len()> y.len(){
+            x
+        }else{
+            y
+        }
+    }
+}
+\end{lstlisting}
+longest returns a reference, but we don't know what the lifetime is. First of all x and y can have different lifetimes, secondly we don't know what are their lifetimes.
+
+In order to fix this we need to use generic lifetime annotations.\begin{definition}
+    \textbf{Generic lifetime annotations} describe the relationship between lifetimes of different references and how they relate to eachother.
+\end{definition}
+We call these generic lifetime annotations, ``lifetimes''.
+
+\paragraph*{Using Lifetimes}\begin{lstlisting}
+    fn main() {
+    let string1=String::from("abcd");
+    let string2 = String::from("xyz");
+    let result = longest(string1.as_str(), string2.as_str());
+    println!("The longest string is {}", result); 
+    fn longest<'a>(x:&'a str, y:&'a str) -> &'a str{  // What wer are saying is that the lifetime of the return reference is the same as the smallest lifetime of the argument.
+        if x.len()> y.len(){
+            x
+        }else{
+            y
+        }
+    }
+}
+\end{lstlisting}
+
+How does the borrow-checker know that result is a valid reference? We just told the borrow checker that 'result' has the lifetime equal to the smallest lifetime passed in. 
+So the borrow checker just needs to check that if result is called the smallest lifetime is still valid.
+
+\paragraph*{Example with different lifetimes}\begin{lstlisting}
+    fn main() {
+    let string1=String::from("abcd");
+    
+    {
+        let string2 = String::from("xyz");
+
+        let result = longest(string1.as_str(), string2.as_str()); //result is valid until the end of string2's lifetime. 
+        println!("The longest string is {}", result); 
+
+    } 
+}    
+   
+fn longest<'a>(x:&'a str, y:&'a str) -> &'a str{  
+    if x.len()> y.len(){
+        x
+    }else{
+        y
+    }
+}
+\end{lstlisting}
+
+\paragraph*{Error}\begin{lstlisting}
+    fn main() {
+    let string1=String::from("abcd");
+    let result;
+    {
+        let string2 = String::from("xyz");
+
+        result = longest(string1.as_str(), string2.as_str()); //result only last until string2 dies 
+    } 
+    println!("The longest string is {}", result); //Error since string2 is not valid, so result isn't
+}    
+   
+fn longest<'a>(x:&'a str, y:&'a str) -> &'a str{  
+    if x.len()> y.len(){
+        x
+    }else{
+        y
+    }
+}
+\end{lstlisting}
+
+\paragraph*{If lifetime tied only to x}\begin{lstlisting}
+ fn main() {
+    let string1=String::from("abcd");
+    let result;    
+    {
+        let string2 = String::from("xyz");
+        result = longest(string1.as_str(), string2.as_str());
+    } 
+   
+   println!("The longest string is {}", result); 
+    
+}   
+fn longest<'a>(x:&'a str, y:&str) -> &'a str{  
+    x
+}
+\end{lstlisting}
+This code compliles, since the borrow checker just makes sure that result has the same lifetime as string1.
+
+\subsubsection{Structs with lifetime annotations}
+
+
+\begin{lstlisting}
+    struct ImportantExcerpt<'a>{
+    part: &'a str,
+}
+
+fn main(){
+    let novel = String::from("Call me Ishmael, Some years ago....");
+    let first_sentence = novel.split('.').next().expect("Could not find sentence");
+    let i = ImportantExcerpt{
+        part: first_sentence,
+    };
+}
+\end{lstlisting}
+
+Variable i is only valid as long as first\_sentence is in scope, we will get an error if we try to use it after first\_sentence has left scope.
+
+\subsection{Lifetime elision rules}
+
+There are some times when the compiler can determinstically infer the lifetimes annotations by checking the \textbf{three lifetime elision rules}.  
+
+\begin{definition}
+    \textbf{Input lifetimes} are the lifetimes of the argument that are passed in
+\end{definition}
+
+\begin{definition}
+    \textbf{Output lifetime} are the lifetimes fo the arguments returned.
+\end{definition}
+
+\begin{definition}
+    \textbf{Three rules:}
+
+    \begin{enumerate}
+        \item Each parameter that is a reference gets its own lifetime paramater
+        \item If there is exactly one input lifetime parameter, that lifetime is assigned to all output lifetime parameters
+        \item If there are multiple input lifetime parameters, but one of them is \&self or \&mut self the lifetime of self is assigned to all output lifetime paramaters.
+    \end{enumerate}
+\end{definition}
+THe compiler will try to follow these three rules, if it can't determine the lifetimes at the end of these three rules, we will have to manually specify them.
+
+\begin{lstlisting}
+    struct ImportantExcerpt<'a>{
+    part: &'a str,
+}
+
+impl<'a> ImportantExcerpt<'a>{
+    fn return_part(&self, announcement: &str) -> &str{
+        println!("Attenetion please: {}", announcement);
+        self.part
+    }
+}
+
+fn main(){
+   // ....
+}
+\end{lstlisting}
+We don't have to specfiy the lifetime of our return\_part function since, by using the three rules the compiler can figure it out itself. 
+If gives a lifetime parameter to each input parameter will get a lifetime (so \&self will get 'a and announcement will get 'b). The second rule doesn't apply, but rule three says that the lifetime of \& self will be given to the output lifetime.
+
+
+\paragraph*{static lifetime}
+\begin{definition}
+    \textbf{The static lifetime} means that the reference can live as long as the duration of the program. For example all string literals since they are stored in the code binary.
+\end{definition}
+\newpage
+\paragraph*{Example combining generics, traits and lifetimes.}\begin{lstlisting}
+    use std::fmt::Display;
+
+fn longest_with_an_announcement<'a, T>(
+    x: &'a str,
+    y: &'a str, //Need to specify lifetime since more than 1 input.
+    ann: T, //Generic
+) ->&'a str
+where
+    T:Display, //Triat bound limit T to only those that implement Display
+{
+    println!("Announcement! {}", ann);
+    if x.len() > y.len(){
+        x
+    }else {
+        y
+    }
+}
+
+fn main(){
+    let announcement = String::from("Grand finale");
+    let x = "we did generics, traits and lifetimes";
+    let y = "how fun!!!!";
+    let result = longest_with_an_announcement(x, y, announcement);
+    println!("These past sections {}, {}", result, y);
+}
+\end{lstlisting}
+
+\paragraph*{Output}\begin{lstlisting}
+Announcement! Grand finale
+These past sections we did generics, traits and lifetimes, how fun!!!!
+\end{lstlisting}
+
+\section{Testing}
+
+\subsection{Writing tests}
+
+Why do we want to write tests? Rust checks that our code works correctly with borrow checker and checking types etc.. But it doesn't check that our functions are 
+working in the way we intend them to. Which is why we need to make tests. 
+
+\
+
+In Rust functions are tests if they have the \#[test] attribute. In order to run our tests, we type in cargo test in the terminal. Our test will fail when something inside the test function panics.
+\newpage 
+\paragraph*{Testing our Rectangle struct}\begin{lstlisting}
+    #[derive(Debug)]
+struct Rectangle{
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle{
+    fn can_hold(&self, other: &Rectangle) -> bool{
+        self.width>other.width&&self.height>other.height
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*; // We need to bring our product code into scope
+
+    #[test]
+    fn larger_can_hold_smaller(){
+        let larger = Rectangle{
+            width: 8,
+            height: 7,
+        };
+        let smaller = Rectangle{
+            width: 5,
+            height:1,
+        };
+
+        assert!(larger.can_hold(&smaller));
+    }
+    #[test]
+    fn smaller_cannot_hold_larger(){
+        let larger = Rectangle{
+            width: 8,
+            height: 7,
+        };
+        let smaller = Rectangle{
+            width: 5,
+            height:1,
+        };
+
+        assert!(!smaller.can_hold(&larger));
+    }
+}
+\end{lstlisting}
+In this case our two tests pass, if we changed a `>' into a `<' in the implematation of can\_hold, out larger\_can\_hold\_smaller test would fail.
+
+\paragraph*{assert equal and not equal}\begin{lstlisting}
+    pub fn add_two(a:i32)->i32{
+    a+3
+}
+#[cfg(test)]
+mod tests {
+   use super::*; 
+    #[test]
+    fn it_adds_two(){
+        assert_ne!(4,add_two(2)); // passes if 4 not equal to add_two(2)
+    }
+    fn it_adds_three(){
+        assert_eq!(5,add_two(2)); // passes if 5 is equal to add_two(2)
+    }
+}
+\end{lstlisting}
+Both paramaters passed in assert\_eq! and assert\_ne! must implement the PartialEq and Debug traits.
+\paragraph*{Custom failure message}\begin{lstlisting}
+    use std::fmt::format;
+
+pub fn greeting(name: &str) ->String{
+    format!("Hello")
+}
+#[cfg(test)]
+mod tests {
+use super::*; 
+    #[test]
+    fn greeting_contains_name(){
+        let result = greeting("Carol");
+        assert!(
+            result.contains("Carol"),
+            "Greeting did not contain name, value was {}", result // Custom failure message
+        );
+    }
+}
+\end{lstlisting}
+
+\paragraph*{Failure message}\begin{lstlisting}
+    thread 'tests::greeting_contains_name' panicked at 'Greeting did not contain name, value was Hello'
+\end{lstlisting}
+
+\paragraph*{Asserting a function that panics}\begin{lstlisting}
+    pub struct  Guess{
+    value: i32,
+}
+
+
+impl Guess{
+    pub fn new(value:i32) -> Guess{
+        if value < 1 || value >100{
+            panic!("Guess value must be between 1 and 100, got {}.", value);  
+        }
+
+        Guess {value}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+use super::*; 
+    #[test]
+    #[should_panic] // Asserts that the test panics
+    fn greater_than_100(){
+        Guess::new(200);
+    }
+}
+\end{lstlisting}
+
+Since we have the \#[should\_panic] our tests pass.
+
+\paragraph*{Many panics}\begin{lstlisting}
+    pub struct  Guess{
+    value: i32,
+}
+
+
+impl Guess{
+    pub fn new(value:i32) -> Guess{
+        if value < 1{
+            panic!("Guess value must be greater than or equal to 1, got {}", value);
+        }else if value > 100{
+            panic!("Guess value must be less than or equal to 100, got {},", value)
+        }
+
+        Guess {value}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+use super::*; 
+    #[test]
+    #[should_panic(expected = "Guess value must be less than or equal to 100")]
+    fn greater_than_100(){
+        Guess::new(200);
+    }
+}
+\end{lstlisting}
+
+Here our test passes only if when our failure message is what we have expected. If we change Guess::new{(200)} to Guess::new{(-2)} our test fails.
+
+
+\paragraph*{Tests that return a result type}\begin{lstlisting}
+    #[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() -> Result<(), String>{
+        if 2+2 == 4{
+            Ok(())
+        } else {
+            Err(String::from("two plus two not equal to four!"))
+        }
+    }
+}
+\end{lstlisting}
+
+
 \end{document}
