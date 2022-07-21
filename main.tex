@@ -2024,24 +2024,16 @@ THe compiler will try to follow these three rules, if it can't determine the lif
 
 impl<'a> ImportantExcerpt<'a>{
     fn return_part(&self, announcement: &str) -> &str{
-        println!("Attenetion please: {}", announcement);
-        self.part
-    }
-}
-
-fn main(){
-   // ....
-}
-\end{lstlisting}
-We don't have to specfiy the lifetime of our return\_part function since, by using the three rules the compiler can figure it out itself. 
-If gives a lifetime parameter to each input parameter will get a lifetime (so \&self will get 'a and announcement will get 'b). The second rule doesn't apply, but rule three says that the lifetime of \& self will be given to the output lifetime.
-
-
-\paragraph*{static lifetime}
-\begin{definition}
-    \textbf{The static lifetime} means that the reference can live as long as the duration of the program. For example all string literals since they are stored in the code binary.
-\end{definition}
-\newpage
+        println!("Attenetion please: {15 Hours a Day of Mathematics Self-Study
+        28,988 views
+        Jun 14, 2022
+        1.3K
+        Dislike
+        Share
+        Thanks
+        Clip
+        Save
+        
 \paragraph*{Example combining generics, traits and lifetimes.}\begin{lstlisting}
     use std::fmt::Display;
 
@@ -2248,6 +2240,186 @@ mod tests {
     }
 }
 \end{lstlisting}
+\subsection{Running tests and organising into unit tests and integration test}
+\subsubsection{Configuring tests}
+By default all test are run in parallel in a seperated thread and all output is capture and not printed to screen.
 
 
+There are two sets of command line options, one sets goes to the cargo test command and the other to the resulting test binary.
+
+If we want to figure out which option we could pass to the cargo test command we type:\begin{lstlisting}
+    cargo test --help
+\end{lstlisting}
+
+
+And to figure out which command we can pass to our resulting test binary we type:\begin{lstlisting}
+    cargo test -- --help
+\end{lstlisting}
+
+\begin{example}
+    If we want to run tests serially we can set the option like so:\begin{lstlisting}
+        cargo test -- --test-threads=1
+    \end{lstlisting}
+\end{example}
+
+By default standard output is captured for passing test, so will only see printed output for failing tests. We can change that by using this command:
+\paragraph{Showing output}\begin{lstlisting}
+    cargo test -- --show-output
+\end{lstlisting}
+
+\begin{lstlisting}
+    fn prints_and_returns_10(a: i32) -> i32{
+        println!("I got the value {}", a);
+        10
+}
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+    
+        #[test]
+        fn this_test_will_pass(){
+            let value = prints_and_returns_10(4); // This code will print out if we use above command but not by default
+            assert_eq!(10,value);
+        }
+    
+    
+        #[test]
+        fn this_test_will_fail(){
+            let value = prints_and_returns_10(8); // This code will always print since the test fails
+            assert_eq!(5, value);
+        }
+    }       
+\end{lstlisting}
+
+\paragraph{Running a subset of tests}\begin{lstlisting}
+    pub fn add_two(a:i32)->i32{
+    a+2
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_two_and_two(){
+        assert_eq!(4, add_two(2));
+    }
+   
+   #[test]
+    fn add_three_and_two(){
+        assert_eq!(5, add_two(3));
+    }
+
+    #[test]
+    fn one_hundred(){
+        assert_eq!(102, add_two(100));
+    }
+
+}
+\end{lstlisting}
+
+In this example we can:\begin{itemize}
+    \item Only run a specific test by specifiying it's name:\begin{lstlisting}
+        cargo test one_hundred 
+    \end{lstlisting}
+    \item Run tests with a common part of their name:\begin{lstlisting}
+        cargo test add
+    \end{lstlisting}
+    This will run tests for add\_two\_and\_two and add\_three\_and\_two
+    \item Run tests by specifying the module:\begin{lstlisting}
+        cargo test tests::
+    \end{lstlisting}
+    Which will run all three tests in the module. 
+\end{itemize}
+
+\paragraph{Ignoring tests}\begin{lstlisting}
+    #[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works(){
+        assert_eq!(2+2,4);
+    }
+
+    #[test]
+    #[ignore] // This makes it so that we ignore this tests when we run cargo test
+    fn expensive_test(){
+        // code that takes an hour to run
+    }
+}
+\end{lstlisting}
+
+
+To run ignored test\begin{lstlisting}
+    cargo test -- --ignored
+\end{lstlisting}
+
+\subsubsection{Test organisation}
+\begin{definition}
+    The Rust community puts tests in two main categories:
+    \begin{itemize}
+        \item Unit tests, small, focused, tests one module in isolation and can tests private interfaces
+        \item Integration tests, external to library so tests the public interface of library.
+    \end{itemize}    
+Up until now we have been writing unit tests, they live in the same file as our product code. Integration tests live in a folder called tests at the root of our project.
+\end{definition}
+
+\paragraph*{Unit test}\begin{lstlisting}
+    pub fn add_two(a:i32)->i32{
+    internal_adder(a,2)
+}
+
+fn internal_adder(a:i32, b:i32) ->i32{
+    a+b
+}
+
+// Convention that in the same file as our product code we have a module named test, that runs tests.
+#[cfg(test)] // This makes it so that we only compile the bellow code when we run test.
+mod tests { //Test module, holds our test.
+    use super::*;
+
+    #[test]
+    fn internal(){
+        assert_eq!(4, internal_adder(2, 2)); // internal_adder is private but we can call it since in rust, child modules can access anything in parent module including private fields.
+    }
+}
+\end{lstlisting}
+
+\paragraph*{Integration Test}\begin{lstlisting}
+//In the test folder in the root file, file path is adder/tests/integration_test.rs
+use adder;
+
+#[test]
+fn it_adds_two(){
+    assert_eq!(4, adder::add_two(2)); // Need to call the public API, can't call the inner adder function
+}
+\end{lstlisting}
+If we want to run just our integration test we can type:\begin{lstlisting}
+    cargo test --test integration_test
+\end{lstlisting}
+
+Because every file in test directory is treated like a seperate crate, it can cause unexpected behaviour.
+
+Assume we have multiple integration test files and want to share some code between them. If we try to create a new file called common.rs where we will store the common code between the integration tests. Rust will treat it like another integration test file, which is not what we want.
+
+To get the behaviour we want let us create a folder in our tests directory, called common and create a file in it called mod.rs and put in the shared code in this file.
+
+This words since files in subdirectories of our test folder do not get compiled as crates. Furthremore, our shared code is now in a module that can be used by the other integration test files.
+
+\paragraph*{Using common code for integrated tests}\begin{lstlisting}
+    use adder;
+
+mod common; //Module declaration it will look content of module in either a file called common.rs or a folder called common with a file called mod.rs 
+
+#[test]
+fn it_adds_two(){
+    common::setup(); //Using the module here 
+    assert_eq!(4, adder::add_two(2));
+\end{lstlisting}
+\paragraph*{mod.rs file}\begin{lstlisting}
+// Path /adder/tests/common/mod.rs
+    pub fn setup(){
+    // set up code
+}
+\end{lstlisting}
+
+Note we cannot directly test binary crates with integration tests, which is why it is common to see a binary crate that is a thin wrapper around a library crate, so that we can test the library crate with integration tests.
 \end{document}
