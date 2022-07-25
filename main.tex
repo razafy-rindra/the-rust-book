@@ -3030,5 +3030,235 @@ In file poem.txt
 Are you nobody, too?
 How dreary to be somebody!
 
-\end{lstlisting} This is our output.txt file when we run our program without errors.
+\end{lstlisting} 
+This is our output.txt file when we run our program without errors.
+
+\section{Closures}
+\begin{definition}
+    \textbf{Closures} are like functions but they don't have names. They can be stored in variables or passed in as parameters of a function.
+\end{definition}
+We don't have to annotate the type of input and output values, the compiler is able to determine the types. As closures are usually short and used in a narrow context. But closures can only have one type infered by the compiler.
+
+\
+
+
+In order to define structs, enums or function parameters that use closures we need to use generics and trait bounds.
+
+\paragraph*{Struct containing closure}\begin{lstlisting}
+    struct Cacher<T>
+where 
+    T: Fn(u32)->u32, // Any function that takes in an u32 and returns a u32
+{
+    calculation: T, 
+    value: Option<u32>,
+}
+\end{lstlisting}
+
+
+\paragraph*{Closuures can't have many types infered for each parameters}\begin{lstlisting}
+    let example_closure = |x| x;
+    let s = example_closure(String::from("hello")); // Compiler infers that the example closure takes in a string and outputs a string.
+    let n = example_closure(5); //Error expected a string but got an integer. 
+\end{lstlisting}
+
+\begin{example}
+    In this example, let us say that we are working on the backend of a fitness app, which makes workout plans based on specification by the user.
+    We will simulate a function that makes an expensive calculation, and we will simulate the code that will create the workout. 
+
+    \begin{lstlisting}
+        use std::thread;
+use std::time::Duration;
+
+fn simulated_expensive_calculation(intensity: u32) -> u32{
+    println!("calculating slowly....");
+    thread::sleep(Duration::from_secs(2));
+    intensity
+}
+
+fn main(){
+    let simulated_intensity = 10;
+    let simulated_randon_number = 7;
+
+    generate_worlout(simulated_intensity, simulated_randon_number);
+}
+
+fn generate_worlout(intensity: u32, random_number: u32){
+    if intensity < 25{
+        println!(
+            "Today, do {} pushups!", 
+            simulated_expensive_calculation(intensity)
+        );
+        println!(
+            "Today, do {} situps!", 
+            simulated_expensive_calculation(intensity)
+        );
+    } else {
+        if random_number == 3{
+            println!("Take a break today! Remember to stay hydrated!");
+        } else {
+            println!(
+                "Today, run for {} minutes",
+                simulated_expensive_calculation(intensity)
+            );
+        }
+    }
+}
+    \end{lstlisting}
+
+This code works, but can use some refactoring. Since we are calling our expensive function in multiple places, if we change how this function is called we will have to change all the callsites. Furthermore we call our function multiple times when we don't need to, for example in the first ``if block'' we call it twice when we only need to call 
+it once and pass in the return value in the print statements.
+\begin{lstlisting}
+    fn generate_worlout(intensity: u32, random_number: u32){
+    let expensive_result = simulated_expensive_calculation(intensity);
+    if intensity < 25{
+        println!(
+            "Today, do {} pushups!", 
+            expensive_result
+        );
+        println!(
+            "Today, do {} situps!", 
+            expensive_result
+        );
+    } else {
+        if random_number == 3{
+            println!("Take a break today! Remember to stay hydrated!");
+        } else {
+            println!(
+                "Today, run for {} minutes",
+                expensive_result
+            );
+        }
+    }
+}
+\end{lstlisting}
+
+But notice we still call our expensive function when we may not need it (when intensity > 25 and the random number is 3). Let us fix this with closures.
+
+\paragraph*{Refactoring our function with Cacher}\begin{lstlisting}
+    
+struct Cacher<T>
+where 
+    T: Fn(u32)->u32, 
+{
+    calculation: T, 
+    value: Option<u32>,
+}
+
+impl<T> Cacher<T>where 
+T: Fn(u32)->u32, 
+{
+    fn new(calculation: T) -> Cacher<T>{
+        Cacher { 
+            calculation, 
+            value:None,
+        }
+    }
+
+    fn value(&mut self, arg: u32)->u32{
+        match self.value{
+            Some(v) => v,
+            None =>{
+                let v = (self.calculation)(arg);
+                self.value = Some(v);
+                v
+            }
+        }
+    }
+}
+
+
+fn generate_worlout(intensity: u32, random_number: u32){
+    let mut cached_result = Cacher::new(|num|{ 
+        println!("calculating slowly....");
+        thread::sleep(Duration::from_secs(2));
+        num
+    });
+    if intensity < 25{
+        println!(
+            "Today, do {} pushups!", 
+            cached_result.value(intensity) // Call our expensive operation here
+        );
+        println!(
+            "Today, do {} situps!", 
+            cached_result.value(intensity) // Don't call the expensive operation here, since the value was already stored.
+        );
+    } else {
+        if random_number == 3{
+            println!("Take a break today! Remember to stay hydrated!");
+        } else {
+            println!(
+                "Today, run for {} minutes",
+                cached_result.value(intensity)
+            );
+        }
+    }
+}
+\end{lstlisting}
+We might want to use our cacher in different contexts, but there are two problems prevemt us from doing this:\begin{enumerate}
+    \item Calling our value method will return the same value even if we input a different arg parameter. So we need to cache a different value for each of argument being passed in. We can fix this implematation by storing our values in a Hashmap. The keys are the arguments passed in and the values are the result of the expensive calculation with that argument pass in.
+    \item  Another problem is that we are using hard coded types, we are saying that our program must take in integers and output integers. We can fix this by using generics.
+\end{enumerate}
+\end{example}
+
+\subsection{Capturing environment with closures}
+
+Unlike function, closures have access to variables in the scope where the closure is defined. For example:\begin{lstlisting}
+    fn main(){
+        let x = 4;
+
+        let equal_to_x = |z| z == x; // Even though x is defined outside of our closure our function still has access.
+
+        let y = 4;
+
+        assert!(equal_to_x(y));
+    }
+\end{lstlisting}
+
+Now what happens if we change closure to function?
+
+\begin{lstlisting}
+fn main(){
+    let x = 4;
+
+    fn equal_to_x(z: i32) -> bool {
+        z == x //Error: can't capture dynamic environment in a fn item use the `|| { ... }` closure form instead
+    }
+
+
+    let y = 4;
+
+    assert!(equal_to_x(y));
+}
+\end{lstlisting}
+
+Since closure can capture environment they need to use extra memory to store that context. Since function don't capture their environment they don't need that overhead.
+
+Closure capture their environment in three ways, which correpsond to the three ways a function take paramenters\begin{enumerate}
+    \item Taking Ownership
+    \item Borrowing mutably
+    \item Borrowing immmutably 
+\end{enumerate}
+
+These three ways are encoded in the function traits: \begin{enumerate}
+    \item FnOnce, FnOnce takes ownership of the variables inside the closures environment. Since closures can't take ownership of the same variables more than once, these closures can only be called once.
+    \item FnMut, Mutably borrows values.
+    \item Fn, Immutably borrows values.
+\end{enumerate}
+
+Rust infers which of these traits to use when we create a closure based on how we use the values inside the closures environment. 
+
+But we can, force the closure to take ownership of the values it uses inside it's environment by using the move keyword.\begin{lstlisting}
+    fn main(){
+        let x = vec![1,2,3];
+
+        let equal_to_x = move |z| z == x; // Closure takes ownership of x
+
+        println!("Can't use x here: {:?}", x); // Get error here since we are using a borrowed value after it has been moved.
+
+        let y = vec![1,2,3];
+
+        assert!(equal_to_x(y));
+    }
+
+\end{lstlisting}
 \end{document}
