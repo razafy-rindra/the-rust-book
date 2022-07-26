@@ -3583,4 +3583,266 @@ fn main() {
 
 Is there a performance impact to using loops vs iterators? \textbf{NO}, using higher level abstractions like iterators over loops doesn't have an impact on performance. So using iterators and loops is equivalent.
 In general people prefer to use iteratros since it is a higher level of abstraction and we get access to useful methods.
+
+\section{Publishing a Crate}
+\subsection{Release Profiles}
+
+\begin{definition}
+    \textbf{Release Profiles} allow you to configure how your code is compiled. There are two profile\begin{enumerate}
+        \item \textbf{Dev} defined with good default for development.
+        \item \textbf{Release} define with good defaults for release.
+    \end{enumerate}
+
+    If we run cargo build, it compiles with dev profile if we run cargo build --release it compiles with release profile. 
+    We can customise the setting in the cargo.toml file.
+
+    \begin{lstlisting}
+[package]
+name = "my_crate"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+\end{lstlisting}
+
+Here opt-level tellls the level of optimization we want, $0$ being the least and $3$ being the most. We can modify the level as we want. The full list of setting is on cargo documentation.
+
+
+\subsection{Uploading code to crates.io}
+Before talking about how to upload our code to carates.io, we wiil show how to prepare our code.
+\subsubsection{Preparing our code}
+\paragraph*{Documentation Comments}
+
+Documentation comments are useful when documenting public api so that others know how to use our code. Documentation code starts with three slashes and uses Markdown for formatting. Rust will turn our documentation into a html format that is easy to read.
+
+\subparagraph*{Example of documentation comment}\begin{lstlisting}
+/// Adds one to the number given.
+///
+/// # Examples
+///
+/// ```
+/// let arg = 5;
+/// let answer = my_crate::add_one(arg);
+///
+/// assert_eq!(6, answer);
+/// ```
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}
+\end{lstlisting}
+
+In first line we explain what the function does and then we have an example section that gives an example of how to use our function. Note Rust will run our assert statement as a test, if we run cargo test. This forces our documetation to be in-synced with the code.
+
+In order to build the html documentation for our crate we write:\begin{lstlisting}
+    cargo doc --open
+\end{lstlisting}
+
+\subparagraph*{Other commonly used section}\begin{enumerate}
+    \item Panics: The scenarios in which the function being documented could panic.
+    \item Errors: If the function returns a Result, describing the kinds of errors that might occur and what conditions might cause those errors.
+    \item Safety: Explains why our function is unsafe and conditions when our function panics.
+\end{enumerate}
+\end{definition}
+
+\subparagraph*{Documentating item containing the comment}
+
+If we use //! we will instead of documenting the item follwing the comment it documents the item containg the comment in this example in lib.rs:\begin{lstlisting}    
+//! My Crate
+//! 
+//! `my_crate` is a collection of utilities to make perfoming certain
+//! calculations more convenient
+\end{lstlisting}
+
+So this is documenting our library crate.
+
+\subsection{Exporting a public API}
+
+We have an example where we create an Art module that let's us mix colours:\begin{lstlisting}
+    //! # Art
+//!
+//! A library for modeling artistic concepts.
+
+pub mod kinds {
+    /// The primary colors according to the RYB color model.
+    pub enum PrimaryColor {
+        Red,
+        Yellow,
+        Blue,
+    }
+
+    /// The secondary colors according to the RYB color model.
+    pub enum SecondaryColor {
+        Orange,
+        Green,
+        Purple,
+    }
+}
+
+pub mod utils {
+    use crate::kinds::*;
+
+    /// Combines two primary colors in equal amounts to create
+    /// a secondary color.
+    pub fn mix(c1: PrimaryColor, c2: PrimaryColor) -> SecondaryColor {
+        // --snip--
+        // ANCHOR_END: here
+        SecondaryColor::Orange
+        // ANCHOR: here
+    }
+}
+\end{lstlisting}
+
+Here is how we would access these functions in main.rs\begin{lstlisting}
+use my_crate::kinds::PrimaryColor;
+use my_crate::utils::mix;
+
+fn main() {
+    let red = PrimaryColor::Red;
+    let yellow = PrimaryColor::Yellow;
+    mix(red,yellow);
+}
+\end{lstlisting}
+Let's say that we want users to have access of our enums and mix function at the top level without having to mention their modules.
+
+\subparagraph*{Use the ``pub use'' keyword}\begin{lstlisting}
+pub use self::kinds::PrimaryColor;
+pub use self::kinds::SecondaryColor;
+pub use self::utils::mix;
+\end{lstlisting}
+
+If we go back to main.rs we can import our items from top level of our library:\begin{lstlisting}
+use my_crate::PrimaryColor;
+use my_crate::mix;
+\end{lstlisting}
+
+pub use statement allow us to make the public api different from the internal structure of our program.
+
+\subsection{Publishing to crate.io}
+Currently we must have a github account to log into crate.io, we need to go to the account setting to get an API token (which we should not share with anyone) and run \begin{lstlisting}
+    cargo login tokenabcsdfefefmakcn
+\end{lstlisting} 
+
+Which will log us in, after we are successfuly logged in. Now we can publish but before we do that we must double-check the meta data. When we are developping uniquely our name does not matter but when publishing to cargo.io our name must be unique. 
+So we must go to crates.io and check that our desired name isn't taken. In this case our name is ``my\_crate''. We also need a description and a licence.
+
+
+\textbf{Publishing to crates.io is permanant!} If we want to upload a new version we can update the version number in cargo.toml using the sematic versioning rules. While we can't delete or modify our crates on cargo.io we can stop certain version from being used with the \begin{lstlisting}
+    cargo yank --vers *version_number*
+\end{lstlisting}
+
+So for anyone with this version in their cargo.lock file they can keep using this version. But those downloading our library for the first time won't be allowed to download this version.
+
+If we want to undo our yank just do:\begin{lstlisting}
+    cargo yank --vers *version_number* --undo
+\end{lstlisting}
+
+\section{Cargo Workspace}
+
+\begin{definition}
+    \textbf{Cargo Workspaces} help us manage multiple related packages that are developped in tandem. They share common dependencies resolution by having one Cargo.lock file, and they share one output directory and various settings like profiels.
+\end{definition}
+
+\begin{definition}
+    Packages in our workspace are called \textbf{Workspace members}
+\end{definition}
+
+\paragraph*{Setting up workspace}\begin{lstlisting}
+    [workspace]
+
+    members =[
+        "adder",
+        "add-one",
+    ]\end{lstlisting}
+
+Note the Cargo.lock and target directory are made at the root of our workspace. If we want our adder directory to use our add-one file we need to put it in the dependencies of the adder Cargo.toml file:
+\paragraph*{In add/adder/Cargo.toml}\begin{lstlisting}
+[dependencies]
+add-one = {path = "../add-one"}
+\end{lstlisting}
+
+And in main.rs we write:
+
+\paragraph*{In add/adder/src/main.rs}\begin{lstlisting}
+use add_one;
+
+fn main() {
+    let num = 10;
+    println!(
+        "Hello, world! {} plus one is {}!",
+        num,
+        add_one::add_one(num)
+    );
+}
+\end{lstlisting}
+In order to run our adder package we write \begin{lstlisting}
+    cargo run -p adder
+\end{lstlisting}
+
+
+\subsection{External dependencies}
+
+If we add a dependency in adder and add-one package they will resolve to the same version.
+
+So we can add in rand as a dependency in add-one and when we do cargo build it will be added to the Cargo.lock file. Even though rand is a dependency of our add-one package, it doesn't mean we can use rand in every package.
+
+If we try to bring rand into the scope of main.rs in adder folder we get an error, we must add rand in dependencies of adder Cargo.toml file.
+
+\subsection{Testing}
+
+\paragraph*{In /add-one/src/lib.rs:}\begin{lstlisting}
+    use rand;
+
+pub fn add_one(x:i32)->i32 {
+    x+1
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+    fn it_works(){
+        assert_eq!(3,add_one(2));
+    }
+}
+\end{lstlisting}
+
+If we want to run tests just for add-one write \begin{lstlisting}
+    cargo test -p add-one
+\end{lstlisting}
+
+\subsection{Homework}
+Add another library add-two, which has a another function similar to add-one but adds two.
+
+\subsection{Publishing}
+
+If we want to publish a package withing workspace we must publish them individually. So cd in each directories and run cargo publish in each directory.
+
+\section{Installing Binaries from crates.io with cargo install}
+This is a convenient way for Rust developers to use tools built by other rust developers and published to crates.IoResult
+
+\begin{remark}
+    We can only install packages with binary targets. We need something we can execute.
+\end{remark}
+
+All binaries installed using cargo install are installed in the installation root's \textit{bin} directory.
+
+\begin{example}\textbf{Installing ripgrep}
+    For example we can install Rust's version of grep ripgrep like this:\begin{lstlisting}
+        cargo install ripgrep 
+    \end{lstlisting}
+    The penultimate line of the output tells us where our package was installed and the last line tells us the name of of our executable. 
+\end{example}
+One cool thing with these binaries is that we can use them to extend cargo with custom commands. If we have a binary in our path prefixed by cargo, i.e. cargo-something. We can run this as a subcommand of cargo by typing\begin{lstlisting}
+    cargo something
+\end{lstlisting}
 \end{document}
