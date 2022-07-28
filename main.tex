@@ -186,7 +186,7 @@ Notice that these two have opposite trade-offs.
     \item Ownership model
     
 This is the way Rust manages memory, it's pros are control over memory, faster runtime and smaller program size and is error free (though it does allow for you to opt-out of memory safetey).
-It's cons is that you have a slower write time, slower than with Manual memeory management, Rust has a strict set of rules around memory management.
+It's cons is that you have a slower write time, slower than with Manual memory management, Rust has a strict set of rules around memory management.
 \end{enumerate}
 
 \paragraph*{Stack and Heap}
@@ -3845,4 +3845,91 @@ All binaries installed using cargo install are installed in the installation roo
 One cool thing with these binaries is that we can use them to extend cargo with custom commands. If we have a binary in our path prefixed by cargo, i.e. cargo-something. We can run this as a subcommand of cargo by typing\begin{lstlisting}
     cargo something
 \end{lstlisting}
+
+\section{Box smart Pointer}
+\begin{definition}
+    A \textbf{pointer} is a general concept for a variable that stores a memory adresse that referes or ``points'' to some data in memory. The most common type of pointer in Rust is a \textbf{reference} they borrow the values they point to, so they don't take ownership.
+    References don't have any special capabilities so they don't have any overhead. Unlike \textbf{Smart Pointers} which is a data structure that acts with a structure with metadata and extra capabilities tacked on. In many cases Smart Pointers own the data they point to. Example of smart pointers are \textit{String} and \textit{Vectors}.
+    Smart pointers are implemented using structs with the deref and drop trait. The \textbf{deref} trait lets instances of smart pointer struct to be treated as a reference. The \textbf{drop} trait allows you to customise the code that is run when an instance of our smart pointer goes out of scope. 
+\end{definition}
+We will only talk about the most common smart pointers in Rust.
+
+\subsection{Box}
+\begin{definition}
+    \textbf{Box} is a smart pointer that allows you to allocate values on the heap.
+\end{definition}
+
+\paragraph*{Example}\begin{lstlisting}
+    fn main() {
+    let b=Box::new(5); // Storing 5 on the heap and on the stack we are storing memory adress to value of 5 on the heap.
+    println!("b = {}", b);
+}
+\end{lstlisting}
+When our Box goes out of scope it will be de-allocated, the box smart pointer on the stack will be de-allocated but also the data on the heap will be de-allocated.
+
+
+Box's don't have any overhead except storing the data on the heap, they also don't have many other capabilities. 
+\paragraph*{Typical uses of Box}
+\begin{itemize}
+    \item When we have a type whose exact size can't be known at compile time but what to use value in context that needs to know exact size
+    \item When we have large amount of data and what to transfer ownership but not copy the data.
+    \item When we own a value and only care that value implements a specific trait rather then it being a specific type. This is known as a \textbf{Trait object}.
+\end{itemize}
+Now we will look at a practical example of when we want to use the Box pointer.
+
+\subsubsection{Box pointer and List enum}
+
+\begin{definition}
+    The \textbf{Cons list} is a data structure that comes from Lisp. Where each element in the list holds the value of the list and points to the next value until we reach the end of the list and point to Nil. 
+\end{definition}
+
+
+\paragraph*{List enum}\begin{lstlisting}
+    enum List{ //Error recursive type has infinite size
+    Cons(i32, List),
+    Nil,
+} 
+\end{lstlisting}
+Rust needs to know how much space this will take up at compile time but Rust doesn't know in this case, since our list can be ``arbitrarily'' large. This is a problem the Cons list shares with all other recursive data types.
+
+
+To understand how to fix this with the Box pointer, we must first understand how computes the size of non-recursive enums.
+
+\paragraph*{non-recursive enum}\begin{lstlisting}
+    enum Message{
+    Quit,
+    Move{x:i32, y:i32},
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+\end{lstlisting}
+Rust will figure out the size needed to store an instance of Message, it will go through each variant and see at how much space each variant needs. Rust will figure out which variant uses the most amount of space this is the most space Message will take up (since we can only use one variant at time per instance).
+
+But now for our list Enum we notice that the Cons variant stores a tuple type consisiing of an integer and a list enum, so rust must know how much space the list enum takes to know how much spac ethe list enum takes! 
+
+How do we fix this?
+
+\paragraph*{Fixing with the Box Smart Pointer}\begin{lstlisting}
+    enum List{
+    Cons(i32, Box<List>),
+    Nil,
+}
+\end{lstlisting}
+Why did this fix our error? Well if we look at each variant to see how much space List takes up we see that ``Nil'' takes no space and ``Cons'' stores an integer and a Box Smart Pointer, which is a fixed size pointer, while it points to some arbitrarily amount of data on the heap on the stack it is of fixed size. 
+
+
+\paragraph*{Implementation}\begin{lstlisting}
+    enum List{
+    Cons(i32, Box<List>),
+    Nil,
+}
+
+use List::{Cons,Nil};
+
+fn main() {
+    let list = Cons(1,Box::new(Cons(2, Box::new(Cons(3, Box::new(Nil))))));
+}
+\end{lstlisting} 
+Our code compiles without errors.
+
 \end{document}
