@@ -406,13 +406,13 @@ in a particular scope.
 This prevents ``data races'' where two pointers point at the same data and one pointer reads the data and another one tries to write to the data.
 
 
-What if we try to mix mutable and immutable references? We get another error, we can't have mutable reference if an immutable referece already exists. Immuatble reference don't expect the underlying data to change.
-But we can have many Immuatble references, since we don't expect the underlying value to change.
+What if we try to mix mutable and immutable references? We get another error, we can't have mutable reference if an immutable referece already exists. Immutable reference don't expect the underlying data to change.
+But we can have many immutable references, since we don't expect the underlying value to change.
 
-Note the scope of a reference starts when it introduced and ends when it's used for the last time, so we can define a mutable reference when all the immuatble references are out of scope(so after we use them for the last time).
+Note the scope of a reference starts when it introduced and ends when it's used for the last time, so we can define a mutable reference when all the immutable references are out of scope(so after we use them for the last time).
 
 \paragraph*{Rules of Refences}\begin{enumerate}
-    \item At any given time, we can either have one mutable reference or any number of immuatble reference.
+    \item At any given time, we can either have one mutable reference or any number of immutable reference.
     \item References must always be valid.
 \end{enumerate}
 
@@ -3932,4 +3932,112 @@ fn main() {
 \end{lstlisting} 
 Our code compiles without errors.
 
+\subsection{Deref Triat}
+\subsubsection{Dereference operator `*'}
+
+\begin{definition}
+    For references the \textbf{deference operator} follows memoery address stoered in reference to the actual value.
+\end{definition}
+
+\begin{lstlisting}
+    fn main (){
+    let x = 5;
+    let y = &x;
+
+    assert_eq!(5,x); //True
+    assert_eq!(5,*y); //True 
+    assert_eq!(5,y); //Error can't compare `{integer}` with `&{integer}`
+}
+\end{lstlisting}
+
+We can modify this example to use smart pointers, specifically the smart pointer Box.
+\paragraph*{Now with the Box Smart Pointer}\begin{lstlisting}
+    fn main (){
+    let x = 5;
+    let y = Box::new(x);
+
+    assert_eq!(5,x);
+    assert_eq!(5,*y); // Derefence operator works the same since Box implements the deref trait
+}
+\end{lstlisting}
+
+Let us build our own Box pointer to understand how the deref trait works in more detail.
+
+\paragraph*{MyBox}\begin{lstlisting}
+    use std::ops::Deref; // Bring Deref trait into scope
+
+struct MyBox<T>(T);
+
+impl <T> MyBox<T>{
+    fn new(x:T) -> MyBox<T>{
+        MyBox(x) // Note unlike MyBox, Box doesn't store data on the heap.
+    }
+}
+
+impl<T> Deref for MyBox<T>{
+    type Target = T; // We will talk about this later
+
+    fn deref(&self) -> &T{
+        &self.0 //Return a reference to item stored in tuple struct.
+    }
+}
+
+fn main (){
+    let x = 5;
+    let y = MyBox::new(x);
+
+    assert_eq!(5,x);
+    assert_eq!(5,*y);
+}
+\end{lstlisting}
+The deref trait allows the Rust compiler to take any value that implememnts deref call the deref method to get a reference which the compiler knows how to dereference. 
+
+More clearly at the last line of our above example here is what the compiler calls:\begin{lstlisting}
+    assert_eq!(5,*(y.deref()));
+\end{lstlisting}
+
+This allows us to treatregular reference and types that implements the deref trait the same.
+
+Why doesn't deref return the value itself? The ownership system! If Rust returns the value directly, it will move ownership of the value outside of our smart pointer.
+
+\subsubsection{Deref Coercion}
+
+\begin{definition}
+    \textbf{Deref Coercion} is a convenience feature in Rust that happens automatically for types that implement the deref trait, deref coercion will convert a reference of one type to a reference of a different type.      
+\end{definition}
+\paragraph*{Example}\begin{lstlisting}
+// MyBox implementation here
+fn main (){
+    let m = MyBox::new(String::from("Rust"));
+    hello(&m); 
+}
+
+fn hello(name: &str){
+    println!("Hello, {}!", name);
+}
+\end{lstlisting}
+
+This code works even if \&m is a reference to my box.
+
+\paragraph*{Explanation}\begin{lstlisting}
+    // &MyBox<String> ->(deref) &String ->(deref) &str
+\end{lstlisting}
+Rust sees that the type being passed to hello is different than the type expected by the funciton, and automatically performs these chained deref calls to get the correct type.
+
+If Rust didn't have automatic deref coercion we would have to write our code like this:\begin{lstlisting}
+    hello(&(*m)[...]);
+\end{lstlisting}
+
+\begin{definition}\textbf{Deref Mut}:
+
+Similar to how we use the deref trait to override deref operator for immutatable references, we can use the DerefMut for mutable references.
+\end{definition}
+
+Rust does deref coercion in the follwing cases:\begin{itemize}
+    \item Immutable ref to immutable ref
+    \item mutable ref to mutable ref
+    \item mutable ref to immutable ref
+\end{itemize}
+
+Rust cannot perform deref coercion when going from immmutable ref to mutable ref due to the borrowing rules, \textbf{we can only have one mutable reference to a specific piece of data in a specific scope}.
 \end{document}
