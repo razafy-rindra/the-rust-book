@@ -49,7 +49,7 @@ Some quick notes from the Rust book, and the ``Let's Get Rusty'' \href{https://y
 \section{Common Programming Concepts in Rust}
 \subsection{Variables and Mutability}
 \subsubsection{Mutable variables} 
-Variables in Rust are immmutable by default. In order to createe a mutable variable, we need to add in `mut' in front of the name like so:
+Variables in Rust are immutable by default. In order to createe a mutable variable, we need to add in `mut' in front of the name like so:
 \begin{lstlisting}
     fn main() {
         let mut x = 5;
@@ -3236,7 +3236,7 @@ Since closure can capture environment they need to use extra memory to store tha
 Closure capture their environment in three ways, which correpsond to the three ways a function take paramenters\begin{enumerate}
     \item Taking Ownership
     \item Borrowing mutably
-    \item Borrowing immmutably 
+    \item Borrowing immutably 
 \end{enumerate}
 
 These three ways are encoded in the function traits: \begin{enumerate}
@@ -4039,5 +4039,354 @@ Rust does deref coercion in the follwing cases:\begin{itemize}
     \item mutable ref to immutable ref
 \end{itemize}
 
-Rust cannot perform deref coercion when going from immmutable ref to mutable ref due to the borrowing rules, \textbf{we can only have one mutable reference to a specific piece of data in a specific scope}.
+Rust cannot perform deref coercion when going from immutable ref to mutable ref due to the borrowing rules, \textbf{we can only have one mutable reference to a specific piece of data in a specific scope}.
+\subsection{Drop Trait}
+\begin{definition}
+    The \textbf{drop trait} can be implemented on any type and it tells you what to do when the value goes out of scope. It is mostly used with smart pointers, for example in the box pointer it tells the compiler to deallocate the data stored on the heap.
+\end{definition}
+
+\paragraph*{Example}\begin{lstlisting}
+    struct CustomSmartPointer{
+    data:String,
+}
+
+impl Drop for CustomSmartPointer{ // Drop trait requires that we implement the drop method.
+    fn drop(&mut self) {
+        println!("Dropping CustomeSmartPointer with data `{}`!", self.data);
+    }
+}
+
+
+fn main() {
+    let c = CustomSmartPointer{
+        data: String::from("my stuff"),
+    };
+    let d = CustomSmartPointer{
+        data: String::from("other stuff"),
+    };
+ println!("CustomSmartPointers created.");
+}
+\end{lstlisting}
+\paragraph*{Output}\begin{lstlisting}
+CustomSmartPointers created.
+Dropping CustomeSmartPointer with data `other stuff`!
+Dropping CustomeSmartPointer with data `my stuff`!
+\end{lstlisting}
+
+What happens if we want to customise the cleanup behaviour? Like if we want to clean up early, for example if we are managing locks, we might want to drop the smart pointer to release the lock so that other code can use the data.
+
+\paragraph*{Using c.drop() directly}\begin{lstlisting}
+fn main() {
+    let c = CustomSmartPointer{
+        data: String::from("my stuff"),
+    };
+    let d = CustomSmartPointer{
+        data: String::from("other stuff"),
+    };
+    println!("CustomSmartPointers created.");
+    c.drop(); // Error explicit destructor calls not allowed.
+    println!("Dropped before end of main"); 
+}    
+\end{lstlisting}
+We are not allowed to use the drop method manually since when our variable goes out of scope, Rust will call the drop method again which may lead to a double free.
+
+To manually cleanup the value early, we call the drop function:
+\newpage
+\paragraph*{drop(c)}\begin{lstlisting}
+    fn main() {
+    let c = CustomSmartPointer{
+        data: String::from("my stuff"),
+    };
+    let d = CustomSmartPointer{
+        data: String::from("other stuff"),
+    };
+    println!("CustomSmartPointers created.");
+    drop(c);
+    println!("Dropped before end of main"); 
+}
+\end{lstlisting}
+
+\paragraph*{Output}\begin{lstlisting}
+CustomSmartPointers created.
+Dropping CustomeSmartPointer with data `my stuff`!
+Dropped before end of main
+Dropping CustomeSmartPointer with data `other stuff`!
+\end{lstlisting}
+\subsection{Reference Counting}
+\begin{definition}
+A \textbf{reference counting smart pointer} allows us to share ownership. While most of the time ownership is clear, there are cases where a single value has mutliple owners, for example in a graph a node is owned by all the edges pointing to it, and should not be cleaned up unless no edges point to it. So we use a reference counting smart pointer which keep track of the number of references to a value and when there are no more reference the value is cleaned up.
+An analogy is when watching tv, we only turn off the tv when everyone in the room has left, if we turn it off while there are still people in the room, there will be panic.        
+\end{definition}
+
+The referece counting smart pointer is used when we have a value on the heap and multiple parts of our program read that value and we don't know which part of our program is going to use our value last at compile time.
+\begin{remark}
+The reference counting smart pointer we will see is only used in single threaded programs, we will later see how to use reference counting in multi-threaded programs.
+\end{remark} 
+
+\paragraph*{Trying to use Box pointer}\begin{lstlisting}
+    enum List{
+    Cons(i32, Box<List>),
+    Nil,
+}
+
+use crate::List::{Cons,Nil};
+
+fn main() {
+// b and c both point to a
+    let a = Cons(5, Box::new(Cons(10, Box::new(Nil))));
+    let b = Cons(3,Box::new(a)); // Value of a moved here
+    let c = Cons(4,Box::new(a)); // Error, value used after move
+}
+\end{lstlisting}
+\paragraph*{Using reference counting}\begin{lstlisting}
+    use std::rc::Rc;
+
+enum List{
+    Cons(i32, Rc<List>),
+    Nil,
+}
+
+use crate::List::{Cons,Nil};
+
+fn main() {
+// b and c both point to a
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    let b = Cons(3,Rc::clone(&a)); 
+    let c = Cons(4,Rc::clone(&a));
+}
+\end{lstlisting}
+
+Here we want both b and c to point to the Cons list a. We can't pass in a reference to a in b since we expect an ownede type, so we will have mismatched types. And we can't pass in a directly since then we will move ownership of a into b.
+So the answer is to use the clone method, here the clone method doens't deep copy the value it only increasess the reference count.
+
+\paragraph*{In more details}\begin{lstlisting}
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    println!("count after creating a = {}", Rc::strong_count(&a)); // 1
+    let b = Cons(3,Rc::clone(&a)); 
+    println!("count after creating b = {}", Rc::strong_count(&a)); // 2
+    {
+        let c = Cons(4,Rc::clone(&a));
+        println!("count after creating c = {}", Rc::strong_count(&a)); // 3
+    }
+    println!("count after c leaves scope = {}", Rc::strong_count(&a)); // 2
+}
+\end{lstlisting}
+\begin{remark}
+    The reference counting smart pointer, let's multiple parts of our program to read the same data but not to modify it. If we allowed multiple mutable references we would be violating the borrowing rules. 
+\end{remark}
+
+\subsection{Interior mutability}
+\begin{definition}
+    \textbf{Interior mutatbility} is a design pattern that let's us to mutate data even when there are immutable reference to that data. To do so it uses unsafe code inside a data structure to bypass the borrowing rules. We will learn more about unsafe code later.
+\end{definition}
+
+Even though the borrowing rules are not enforced at compile time they can still be enforced at run time.
+
+\subsubsection{RefCell Smart pointer}
+\begin{definition}
+    The \textbf{RefCell} Smart pointer represents single ownership over the data it holds, like the Box smart pointer. But the Box enforces borrowing at compile time while RefCell enforces borrowing rules at run time.
+\end{definition}
+
+The advantages of checking the borrowing rules at run time is that certain memory safe scenarios are allowed which would be dissallowed at compile time. The RefCell smart pointer is useful when you are sure that you are following the borrowing rules but the compile can't tell that. 
+
+\begin{remark}
+    We can only use RefCell in single threaded programs. We will look at what to do for multi-threaded programs later.
+\end{remark}
+
+Mutating a value inside an immutable value is called the interior mutability pattern.
+
+\begin{lstlisting}
+    
+fn main() {
+    let a  = 5;
+    let b = &mut a; //Error: a is immutable so cannot borrow as mutable
+
+    let mut c = 10;
+    let d = &c;
+    *d = 20; //Error: d is an immutable reference so the data it referes to cannot be written
+}
+\end{lstlisting}
+
+We can solve this with some inderection. We can use a data structure that stores some value, where the value in the data structure is mutable but when we get a reference to the data structure the reference is immutable. So code outside the data structure can't mutatate the value, but we can call methods on the data structure to mutate the data.
+
+This is what the RefCell smart pointer does with one caviate, instead of calling methods to mutate the data we call methods to get a mutable or immutable reference of the data.
+
+\subsubsection{Use case for interior mutability pattern}
+
+\paragraph*{Example}\begin{lstlisting}
+    pub trait Messenger{
+    fn send(&self, msg: &str);
+}
+
+pub struct LimitTracker<'a, T:Messenger>{ // add liftime annotation since we are borrowing T
+    messenger: &'a T,
+    value: usize, // pointer-sized unsigned integer type.
+    max: usize,
+}
+
+impl<'a, T> LimitTracker<'a, T>
+where
+    T:Messenger,
+{
+    pub fn new(messenger: &T, max:usize) -> LimitTracker<T>{
+        LimitTracker{
+            messenger,
+            value:0,
+            max,
+        }
+    }
+}
+
+pub fn set_value(&mut self, value: usize) {
+    self.value = value;
+
+    let percentage_of_max = self.value as f64 / self.max as f64;
+
+    if percentage_of_max >= 1.0 {
+        self.messenger.send("Error: You are over your quota!");
+    } else if percentage_of_max >= 0.9 {
+        self.messenger
+            .send("Urgent warning: You've used up over 90% of your quota!");
+    } else if percentage_of_max >= 0.75 {
+        self.messenger
+            .send("Warning: You've used up over 75% of your quota!");
+    }
+}
+\end{lstlisting}
+This is a library that tracks a value against maximal value and sends message depending on ratio between value with maximal.
+
+Let us implement our tests:
+
+\paragraph*{Testing}\begin{lstlisting}
+    #[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockMessenger {
+        sent_messages: Vec<String>, //vector of sent message
+    }
+
+    impl MockMessenger {
+        fn new() -> MockMessenger {
+            MockMessenger {
+                sent_messages: vec![],
+            }
+        }
+    }
+
+    impl Messenger for MockMessenger {// pushes message to the vector
+        fn send(&self, message: &str) {
+            self.sent_messages.push(String::from(message));  //Error cannot borrow `self.sent_messages` as mutable, as it is behind a `&` reference 
+        }
+    }
+
+    #[test]
+    fn it_sends_an_over_75_percent_warning_message() {
+        let mock_messenger = MockMessenger::new();
+        let mut limit_tracker = LimitTracker::new(&mock_messenger, 100);
+
+        limit_tracker.set_value(80);
+
+        assert_eq!(mock_messenger.sent_messages.len(), 1); //We should have one message
+    }
+}
+\end{lstlisting}
+
+We need an mutable reference but that would break the function signature of send defined in our messenger trait. In this situation we can use the RefCell.
+\newpage
+\paragraph*{Once again with RefCell}\begin{lstlisting}
+    #[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    struct MockMessenger {
+        sent_messages: RefCell<Vec<String>>,
+    }
+
+    impl MockMessenger {
+        fn new() -> MockMessenger {
+            MockMessenger {
+                sent_messages: RefCell::new(vec![]),
+            }
+        }
+    }
+
+    impl Messenger for MockMessenger {
+        fn send(&self, message: &str) {
+            self.sent_messages.borrow_mut().push(String::from(message)); 
+        }
+    }
+
+    #[test]
+    fn it_sends_an_over_75_percent_warning_message() {
+        let mock_messenger = MockMessenger::new();
+        let mut limit_tracker = LimitTracker::new(&mock_messenger, 100);
+
+        limit_tracker.set_value(80);
+
+        assert_eq!(mock_messenger.sent_messages.borrow().len(), 1); 
+    }
+}// All tests pass
+\end{lstlisting}
+
+
+Now recall that RefCell checks the borrowing rules at runtime, so what happens when we have two mutable references at the same time?
+
+\paragraph*{Two borrows}\begin{lstlisting}
+impl Messenger for MockMessenger {
+    fn send(&self, message: &str) {
+        let mut one_borrow = self.sent_messages.borrow_mut();
+        let mut two_borrow = self.sent_messages.borrow_mut();
+            
+        one_borrow.push(String::from(message));
+        two_borrow.push(String::from(message));
+    }
+} // Tests fails: thread 'tests::it_sends_an_over_75_percent_warning_message' panicked at 'already borrowed: BorrowMutError', src/lib.rs:60:53
+\end{lstlisting}
+
+So the interior mutability pattern gives us flexability but we must still follow the borrowing rules.
+
+\subsubsection{Combining Rc with RefCell to get multiple owners of mutable data}
+\paragraph*{Expanding our list code}\begin{lstlisting}
+#[derive(Debug)]
+
+enum List{
+    Cons(Rc<RefCell<i32>>, Rc<List>),
+    Nil,
+}
+
+use crate::List::{Cons, Nil};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+fn main(){
+    let value = Rc::new(RefCell::new(5));
+
+    let a = Rc::new(Cons(Rc::clone(&value), Rc::new(Nil)));
+
+    let b = Cons(Rc::new(RefCell::new(3)), Rc::clone(&a));
+    let c = Cons(Rc::new(RefCell::new(4)), Rc::clone(&a));
+
+    *value.borrow_mut() += 10; // Automatic dereferencing feature.
+
+    println!("a after = {:?}", a);
+    println!("b after = {:?}", b);
+    println!("c after = {:?}", c);
+}
+\end{lstlisting}
+
+\paragraph*{Output}\begin{lstlisting}
+a after = Cons(RefCell { value: 15 }, Nil)
+b after = Cons(RefCell { value: 3 }, Cons(RefCell { value: 15 }, Nil))
+c after = Cons(RefCell { value: 4 }, Cons(RefCell { value: 15 }, Nil))
+\end{lstlisting}
+
+\subsubsection{Recap of the smart pointers we have seen}
+\begin{itemize}
+    \item Rc: enables multiple ownership of the same data; allows only immutable borrows checked at compile time.
+    \item Box: Allow single ownership to piece of data; allows immutable or mutable borrows checked at compile time.
+    \item RefCell: Allows single ownership to piece of data; allows immutable or mutable borrows checked at runtime. (So we mutate value inseide RefCell<T> even when RefCell<T> is immutable)
+\end{itemize}
 \end{document}
