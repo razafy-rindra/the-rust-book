@@ -4537,4 +4537,158 @@ leaf strong = 2, weak = 0
 leaf parent = None
 leaf strong = 1, weak = 0
 \end{lstlisting}
+
+
+\section{Fearless Concurrency}
+\begin{definition}
+    \textbf{Concurrent} programming is when different part of program execute concurrently and \textbf{parallel programming} is when different part of the code execute at the same time. In these notes when we say concurrency, we mean both concurrency and parallel. 
+\end{definition}
+
+\begin{definition}
+    Within a program we can have multiple parts that run at the same time, the features that run these parts of the program are called \textbf{threads}.
+\end{definition}
+
+\paragraph*{Challenges}:\begin{itemize}
+    \item \textbf{Race conditions}, threads are accessing data/resources in inconsistent order
+    \item \textbf{Dead locks}, if two threads both waiting for a resource that another thread has.
+    \item \textbf{Hard to reproduce and fix bugs}, since execution order is non-determinastic. 
+\end{itemize}
+
+\paragraph*{Main kinds of threads}\begin{itemize}
+    \item 1 to 1 threads, aka OS threads, etc..; when we create a thread in our program it maps to our OS thread. So there is a 1 to 1 mapping between the two.
+    \item Green threads, aka user threads, program threads, etc..; special implememntation of threads provided by the programming language. They don't have a 1 to 1 mapping to OS threads.
+\end{itemize}
+Rust aims to have an extremly small runtime, so it must sacrifice features. Since Green threads will require a larger language runtime, Rust only includes 1 to 1 threads  in the standard library. If we want to use green threads we must use crates.
+
+\subsection{Implementing threads}
+
+\paragraph*{Spawning a thread}\begin{lstlisting}
+    use std::{thread, time::Duration};
+
+
+fn main() {
+    thread::spawn(||{
+        for i in 1..10{
+            println!("hi number {} from the spawned thread!", i);
+            thread::sleep(Duration::from_millis(1)); // Pause execution of thread for a milisecond.
+        }
+    });
+
+    for i in 1..5{
+        println!("hi number {} from the main thread!", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+\end{lstlisting}
+
+\paragraph*{Output}\begin{lstlisting}
+hi number 1 from the main thread!
+hi number 1 from the spawned thread!
+hi number 2 from the spawned thread!
+hi number 2 from the main thread!
+hi number 3 from the spawned thread!
+hi number 3 from the main thread!
+hi number 4 from the spawned thread!
+hi number 4 from the main thread!
+hi number 5 from the spawned thread!
+\end{lstlisting}
+Note the main thread finished printing all of it's numbers, but the spawned thread didn't. This is because when the main thread ends the spawned thread stops.
+
+How do we fix the code to make sure that the spawned thread finished execution.
+
+\paragraph*{Code}\begin{lstlisting}
+    use std::{thread, time::Duration};
+
+
+fn main() {
+    let handle = thread::spawn(||{
+        for i in 1..10{
+            println!("hi number {} from the spawned thread!", i);
+            thread::sleep(Duration::from_millis(1)); // Pause execution of thread for a milisecond.
+        }
+    });
+
+    for i in 1..5{
+        println!("hi number {} from the main thread!", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    handle.join().unwrap();
+}
+\end{lstlisting}
+Calling join() blocks the thread currently running(main thread in this case) until the  thread associated with join (i.e. spawned thread) terminates. Blocking a thread prevents it from doing any further work or exiting. 
+
+\paragraph*{Output}\begin{lstlisting}
+hi number 1 from the main thread!
+hi number 1 from the spawned thread!
+hi number 2 from the main thread!
+hi number 2 from the spawned thread!
+hi number 3 from the main thread!
+hi number 3 from the spawned thread!
+hi number 4 from the main thread!
+hi number 4 from the spawned thread!
+hi number 5 from the spawned thread!
+hi number 6 from the spawned thread!
+hi number 7 from the spawned thread!
+hi number 8 from the spawned thread!
+hi number 9 from the spawned thread!
+\end{lstlisting}
+
+If we move our handle.join() right after our spawn thread is created, the main thread will wait until the spawn thread is finished executing.
+\paragraph*{Output if we move handle}\begin{lstlisting}
+hi number 1 from the spawned thread!
+hi number 2 from the spawned thread!
+hi number 3 from the spawned thread!
+hi number 4 from the spawned thread!
+hi number 5 from the spawned thread!
+hi number 6 from the spawned thread!
+hi number 7 from the spawned thread!
+hi number 8 from the spawned thread!
+hi number 9 from the spawned thread!
+hi number 1 from the main thread!
+hi number 2 from the main thread!
+hi number 3 from the main thread!
+hi number 4 from the main thread!
+\end{lstlisting}
+
+So where the join method is called can affect if our threads run at the same time.
+
+\subsection{Move closures}
+
+Up until this point, the thread did not depend on any variable outside of our thread.
+
+\paragraph*{Error}\begin{lstlisting}
+    fn main() {
+    let v = vec![1,2,3];
+    
+    let handle = thread::spawn(||{ //Compile time error: the closure may outlive the current function, but borrows v which is owned by current function.
+        println!("Here's a vector: {:?}", v);
+    });
+
+    drop(v); //oh no!
+
+    handle.join().unwrap();
+}
+\end{lstlisting}
+
+The rust compiler doesn't know if v is always a valid reference. If our code was allowed to run, we could enter the main thread drop the value v, then switch back to the spawned thread, at which point v is invalid.
+
+So Rust doesn't allow us to take a reference to $v$, our thread must take ownership with the move keyword.
+
+\paragraph*{move keyword to force closure to take ownership}\begin{lstlisting}
+    fn main() {
+    let v = vec![1,2,3];
+    
+    let handle = thread::spawn(move ||{ //closure takes ownership of v
+        println!("Here's a vector: {:?}", v);
+    });
+
+    handle.join().unwrap();
+}
+\end{lstlisting}
+\subsection{Using data to pass messages between threads}
+One popular approach to insure safe concurrency is message passing. Where we have threads(actors) passing messagees to eachother which contains data. One tool rusts provides in the std library to pass message is a chanel. Like a chanel of water, we can pass something on the stream it will travel downstream to the end of the water way.
+
+A chanel in programming has two halves the transever(upstream) and the reserver(downstream).
+
 \end{document}
