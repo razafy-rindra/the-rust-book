@@ -3936,7 +3936,7 @@ Our code compiles without errors.
 \subsubsection{Dereference operator `*'}
 
 \begin{definition}
-    For references the \textbf{deference operator} follows memoery address stoered in reference to the actual value.
+    For references the \textbf{deference operator} follows memory address stoered in reference to the actual value.
 \end{definition}
 
 \begin{lstlisting}
@@ -4389,4 +4389,152 @@ c after = Cons(RefCell { value: 4 }, Cons(RefCell { value: 15 }, Nil))
     \item Box: Allow single ownership to piece of data; allows immutable or mutable borrows checked at compile time.
     \item RefCell: Allows single ownership to piece of data; allows immutable or mutable borrows checked at runtime. (So we mutate value inseide RefCell<T> even when RefCell<T> is immutable)
 \end{itemize}
+
+\subsection{Reference Cycles}
+
+Rust is known for being a memory safe language, so it provides certain guarentees like you can't have data races. But it doesn't guarentee that we will not have memory leaks. We can create a memory leak with the Rc and RefCell smart pointers, with these two smart pointers we can create references where items reference eachother in a cylce. Which will create a memory leak.
+
+\paragraph*{Rxample of memory leak}\begin{lstlisting}
+    use crate::List::{Cons,Nil};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+#[derive(Debug)]
+
+enum List{
+    Cons(i32, RefCell<Rc<List>>),
+    Nil,
+}
+
+impl List{
+    fn tail(&self) -> Option<&RefCell<Rc<List>>>{
+        match self{
+            Cons(_, item) => Some(item),
+            Nil => None,
+        }
+    }
+}
+
+fn main() {
+    let a = Rc::new(Cons(5, RefCell::new(Rc::new(Nil))));
+
+    println!("a initial rc count = {}", Rc::strong_count(&a));  // 1
+    println!("a next item ={:?}", a.tail());
+
+    let b = Rc::new(Cons(10,RefCell::new(Rc::clone(&a))));
+
+    println!("a rc count after b creation = {}", Rc::strong_count(&a)); // 2
+    println!("b initial rc count = {}", Rc::strong_count(&b)); // 1
+    println!("b next item = {:?}", b.tail()); // List a
+
+
+    if let Some(link) = a.tail(){ // udr if let since we only care about Some 
+        *link.borrow_mut() = Rc::clone(&b); // We get mutable ref to the data and use dereference operator to change the data into list b.
+    }
+    println!("b rc count after changing a = {}", Rc::strong_count(&b)); // 2
+    println!("a rc count after changing a = {}", Rc::strong_count(&a)); // 2
+}
+//This line proves we have a cycle, it will overflow the stack
+println!("a next item = {:?}", a.tail()); 
+\end{lstlisting}
+We have created a cycle since list a reference list b and list b references list a. More clearly the tail of list a points to list b but the tail of list b points to list a, so when we try to print it on the last line, to print list a it will print list b, but to print list b it will print list a, etc\dots
+
+These circular dependencies also cause a memory leak. Indeed at the end of main a and b will get cleaned up, when b get's cleaned up the memory on the stack is not cleaned up since it is still reference in list a. Then a gets cleaned up but the memory on the heap doesn't get cleaned up since it is reference in the tail of list b.
+
+So we have data on the heap but we don't have any stack variables pointing on this list.
+
+\subsubsection{Tree structure without referece cycles}
+\begin{definition}
+    The \textbf{Weak} smart pointer is a version of the Rc smart pointer that holds a non-owning reference.
+\end{definition}
+
+\begin{lstlisting}
+    use std::cell::RefCell;
+use std::rc::{Rc, Weak};
+
+#[derive(Debug)]
+
+struct Node{
+    value: i32,
+    parent: RefCell<Weak<Node>>,//Can't use Rc since it will cause a reference cycle.
+    children: RefCell<Vec<Rc<Node>>>,
+}
+
+fn main() {
+    let leaf = Rc::new(Node{
+        value: 3,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![]),
+    });
+
+    println!("leaf parent = {:?}", leaf.parent.borrow().upgrade()); //upgrade attempts to turn Weak into Rc, returns None if value was dropped otherwise it returns Some with Rc
+
+    let branch = Rc::new(Node{
+        value: 5,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![Rc::clone(&leaf)]),
+    });
+
+    *leaf.parent.borrow_mut() = Rc::downgrade(&branch); // downgrade turns Rc smart pointer into weak smart pointer. 
+
+    println!("leaf parent = {:?}", leaf.parent.borrow().upgrade()); 
+}
+\end{lstlisting}
+
+\paragraph*{Output}\begin{lstlisting}
+leaf parent = None
+leaf parent = Some(Node { value: 5, parent: RefCell { value: (Weak) }, children: RefCell { value: [Node { value: 3, parent: RefCell { value: (Weak) }, children: RefCell { value: [] } }] } })
+\end{lstlisting}
+
+\paragraph*{Strong and weak count}\begin{lstlisting}
+fn main() {
+    let leaf = Rc::new(Node{
+        value: 3,
+        parent: RefCell::new(Weak::new()),
+        children: RefCell::new(vec![]),
+    });
+
+    println!(
+        "leaf strong = {}, weak = {}",
+        Rc::strong_count(&leaf), // 1
+        Rc::weak_count(&leaf), // 0
+    );
+    
+    {
+        let branch = Rc::new(Node{
+            value: 5,
+            parent: RefCell::new(Weak::new()),
+            children: RefCell::new(vec![Rc::clone(&leaf)]),
+        });
+
+        *leaf.parent.borrow_mut() = Rc::downgrade(&branch); // downgrade turns Rc smart pointer into weak smart pointer. 
+
+        println!(
+            "branch strong = {}, weak = {}",
+            Rc::strong_count(&branch), // 1
+            Rc::weak_count(&branch), // 1, since leaf has a weak reference to branch
+        );
+
+        println!(
+            "leaf strong = {}, weak = {}",
+            Rc::strong_count(&leaf), // 2, since leaf is a child of branch
+            Rc::weak_count(&leaf), // 0
+        );
+
+    }
+    println!("leaf parent = {:?}", leaf.parent.borrow().upgrade()); //None since branch is dropped 
+    println!(
+        "leaf strong = {}, weak = {}",
+        Rc::strong_count(&leaf), // 1
+        Rc::weak_count(&leaf), // 0
+    );
+}
+\end{lstlisting}
+\paragraph*{Output}\begin{lstlisting}
+leaf strong = 1, weak = 0
+branch strong = 1, weak = 1
+leaf strong = 2, weak = 0
+leaf parent = None
+leaf strong = 1, weak = 0
+\end{lstlisting}
 \end{document}
