@@ -4816,5 +4816,98 @@ Got: the
 Got: you
 Got: thread
 \end{lstlisting}
+\subsection{Transfering data with shared state}
+Unlike with the channel where we are passing ownership of a piece of data form one thread to another, with shared state concurrency we have some piece of data in memory that multiple threads can read and write to.
 
+\subsubsection{Mutex}
+\begin{definition}
+    \textbf{Mutex} means mutual exclusion, this means that only one thread can access a piece of data at any time. We achieve this with a locking system. The lock is a data structure that keeps track on what thread can use that piece of data. Once the thread is done with the piece of data it can unlock the data allowing other threads to have access to it.
+\end{definition}
+We need to remember two rules when we use mutex:\begin{enumerate}
+    \item We need to aquire a lock before we have access to data.
+    \item We have to release that lock when we are done with the data, so that other threads can have access.
+\end{enumerate}
+
+\paragraph*{Simple implementation}\begin{lstlisting}
+    use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        let mut num = m.lock().unwrap(); //Block current thread until that lock is aquired. Calling lock will fail if there is already another thread that has a lock to data and it panics, then our call will fail.  unwrap() makes us panic.
+        *num = 6;
+    }
+
+    println!("m = {:?}", m); // value stored in m is 6
+}
+\end{lstlisting}
+num is of type MutexGuard smart pointer. When MutexGuard goes out of scope it calls drop trait which will release lock to the data. 
+
+\paragraph*{Sharing value between threads}\begin{lstlisting}
+use std::sync::Mutex;
+use std::thread;
+use std::rc::Rc;
+
+fn main() {
+    let counter = Rc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10{
+        let counter = Rc::clone(&counter); // At each iteration counter gets moved, so counter needs many owners
+        let handle = thread::spawn(move ||{ // Error: Since Rc pointer is not thread safe
+            let mut num = counter.lock().unwrap();
+
+            *num +=1;
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles{
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+\end{lstlisting}
+
+So we want is something exactly like Rc but thread safe. We will use atomic reference counting smart pointer.
+\paragraph*{Fixed with Arc}\begin{lstlisting}
+use std::sync::{Arc,Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10{
+        let counter = Arc::clone(&counter); // At each iteration counter gets moved, so counter needs many owners
+        let handle = thread::spawn(move ||{ // Error: Since Rc pointer is not thread safe
+            let mut num = counter.lock().unwrap();
+
+            *num +=1;
+        });
+
+        handles.push(handle);
+    }
+
+    for handle in handles{
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+\end{lstlisting}
+Note counter is immutable but we can get mutable reference to value inside since Mutex uses interior mutability.
+
+\begin{remark}
+    Mutex may cause deadlocks.
+\end{remark}
+
+\subsection{Building concurrency features}
+
+While the rust language provide few concurrency features, it does provide the building blocks for us to build our own or use features built by someone else.
+
+Two basic concurrency concepts provided by std lib are the send and sync traits.
 \end{document}
