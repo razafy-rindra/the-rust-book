@@ -4910,4 +4910,70 @@ Note counter is immutable but we can get mutable reference to value inside since
 While the rust language provide few concurrency features, it does provide the building blocks for us to build our own or use features built by someone else.
 
 Two basic concurrency concepts provided by std lib are the send and sync traits.
+
+\section{Object Oriented Programming features in Rust}
+When it comes to OOP there are three characteristics that all OOP languages share:\begin{itemize}
+    \item Objects
+    \item Encapsulation
+    \item Inheritance
+\end{itemize}
+
+Let us talk about each of these characteristics and if they are supported in rust. Objects are made out of data and methods that operate on that data. 
+\subsection{Objects}
+In Rust structs and enums hold data and we can define impl blocs to create methods for them. So even if they are not called objects they function in the same way.
+
+\subsection{Encapsulation}
+\begin{definition}
+    \textbf{Encapsulation} means that implementation details of an object are hidden from the code using that object. Code outside of the object can only interact with object through the public API. 
+\end{definition}
+
+Previously we learned how to use the pub keyword to decide which modules, types, function and methodes are public since everything is private by default.
+
+\begin{lstlisting}
+    pub struct AveragedCollection{ //struct is public so outside code can use it
+        list: Vec<i32>, // fields are private
+        average: f64,
+    }
+    impl AveragedCollection{
+    pub fn add(&mut self, value:i32){
+        self.list.push(value);
+        self.update_average();
+    }
+
+    pub fn remove(&mut self) -> Option<i32>{
+        let result = self.list.pop();
+        match result {
+            Some(value) =>{
+                self.update_average();
+                Some(value)
+            }
+            None => None,
+        }
+    }
+
+    pub fn average(&self) -> f64{
+        self.average
+    }
+
+    fn update_average(&mut self){ //private method
+        let total: i32 = self.list.iter().sum();
+        self.average = total as f64 / self.list.len() as f64;
+    }
+}
+\end{lstlisting}
+
+We can change everything that is private (for example using hashmap instead of vec), and as long as the signatures of the public functions stay the same code using our struct doesn't have to care.
+\subsubsection{Inheritance}
+\begin{definition}
+    \textbf{Inheritance} is the ability of an object to inherit from another object's definition gaining the data and behaviour of that other object without having to define the data and behaviour itself. 
+\end{definition}
+
+Rust doesn't have this ability, you can't define a struct that inherits fields and methods from another struct. Rust has other tools we can use depending on why we are reaching for inheritance.
+
+There are two main reason to use inheritance\begin{itemize}
+    \item Code sharing, we can implement behaviour on one type and all other types that inherit from it can reuse that behaviour. In rust we can do this by using default trait method implementations. There is a limit, traits can only define methods not fields, but there is a proposal for them to define fields.
+    \item Polymorphims, allows us to substitute multiple objects at run time if they share certain characterstic, in classical inhertence that is a parent class. For example we can have base class Vehicles, and have subclasses inherit from that such as Truck, Car, etc.. And if we have a function that takes in a Vehicle at runtime we can pass in a Truck, Car, etc.. to that function.
+    Rust takes in a different approach, in Rust we use generic to abstract away concrete types and we use trait bounds to restrict the characteristic of those types. Rust also provides trait objects which are similar to generics but they use dynamic dispatch while generics use static dispatch. We will see more about this in the next part.
+\end{itemize}
+
 \end{document}
