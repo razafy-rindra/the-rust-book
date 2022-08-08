@@ -3233,7 +3233,7 @@ fn main(){
 
 Since closure can capture environment they need to use extra memory to store that context. Since function don't capture their environment they don't need that overhead.
 
-Closure capture their environment in three ways, which correpsond to the three ways a function take paramenters\begin{enumerate}
+Closure capture their environment in three ways, which correpsond to the three ways a function take parameters\begin{enumerate}
     \item Taking Ownership
     \item Borrowing mutably
     \item Borrowing immutably 
@@ -4976,4 +4976,305 @@ There are two main reason to use inheritance\begin{itemize}
     Rust takes in a different approach, in Rust we use generic to abstract away concrete types and we use trait bounds to restrict the characteristic of those types. Rust also provides trait objects which are similar to generics but they use dynamic dispatch while generics use static dispatch. We will see more about this in the next part.
 \end{itemize}
 
+
+\section{Trait objects}
+Imagine we were building a GUI library, where the goal is to take in a list of visual elements (i.e. buttons, text boxes, etc..) and draw them on the screen. We want users to be able to create their own visual components that can be drawn on the screen. At compile time we don't know the breath of objects used at compile time, but we know they will have a method called Draw.
+
+\
+
+If we were using a language with classical inheritance we may create a base class called visualComponents with a Draw method, where each visual component will inherit, or override with their own implement. 
+
+\
+
+In Rust we define shared behaviour using \textbf{traits}.
+
+\begin{definition}
+    Traits are define by first specifying some Pointer (like ref, or smart pointer) and use the dyn keyword followed by the relevant trait.
+    
+    \begin{lstlisting}
+        pub components: Vec<Box<dyn Draw>>,
+    \end{lstlisting}
+
+When we define our trait object, at compile time Rust will make sure everything in the vector implements the Draw trait,
+\end{definition}
+
+Why shouldn't we use generics rather than trait objects? When we use generics we are limited to one type! \begin{lstlisting}
+    pub struct Screen<T: Draw>{
+    pub components: Vec<T>,
+}
+\end{lstlisting}
+
+Then we can only store one type in our vector, either all buttons or all text boxes. Using trait objects we can store buttons, textboxes, etc... in the same vector.
+
+
+\newpage
+\paragraph*{lib.rs}\begin{lstlisting}
+    pub trait Draw{
+    fn draw(&self);
+}
+
+pub struct  Screen{
+    pub components: Vec<Box<dyn Draw>>,
+}
+
+impl Screen{
+    pub fn run(&self) {
+        for component in self.components.iter(){
+            component.draw();
+        }
+    }
+}
+
+
+
+pub struct Button{
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl Draw for Button{
+    fn draw(&self){
+        //draw button
+    }
+} // Note even though we must implement the Draw trait and draw() method for button, we can implement other methods as well. Like an on-click method.
+\end{lstlisting}
+
+\paragraph*{main.rs}\begin{lstlisting}
+use gui_lib::{Screen, Button, Draw};
+
+// Defining our own screen component,
+struct SelectBox{
+    width: u32,
+    height: u32,
+    options: Vec<String>,
+}
+
+impl Draw for SelectBox{
+    fn draw(&self){
+        //draw select box
+    }
+}
+
+fn main(){
+    let screen = Screen{
+        components: vec![
+           // Box::new(String::from("test")), Error since String doesn't implement draw
+            Box::new(SelectBox{
+                width: 100,
+                height: 100,
+                options: vec![
+                    String::from("yes"),
+                    String::from("no"),
+                    String::from("maybe"),
+                ]
+            }),
+            Box::new(Button{
+                width: 100,
+                height: 100,
+                label: String::from("ok")
+            })
+        ],
+    };
+
+    screen.run();
+}
+\end{lstlisting}
+
+\subsection{Static vs Dynamic dispatch}
+\begin{definition}
+    \textbf{Monomorphism}, is a process when the compiler will generate non-generic implementation of function based on concrete types used in place of generic types.
+    
+    For example, we have a function add, which takes two generic parameters and adds them, if we use that function with floats and integers the compile will create a function for integer\_add and float\_add and find the call sites of the add method and replace it with the concrete implementation.
+    
+    This is called \textbf{Static dispatch}; the compiler knows the concrete functions we are calling at compile time. The opposite is \textbf{dynamic dispatch}, the compile figures out what concrete methods we are running at run time. 
+\end{definition}
+
+When using trait objects, Rust compiler uses dynamic dispatch since it doesn't know all the concrete objects used at compile time. There is a runtime performance cost in using this, but we get to write flexible code that accepts any object that implements a certain trait.
+
+
+\subsection{Object Safety}
+
+We can only make object safe traits into trait bounds. A trait is object safe if all methods implemented on that trait have these properties\begin{definition}
+    \item Return type is not \&self
+    \item There are no generic parameters
+\end{definition}
+
+If the trait doesn't have these properties, the compiler can't figure out the concrete type of that trait and doesn't know what method to call.
+
+
+\section{Implementing the state object oriented pattern}
+
+In the state pattern we have some value that has internal state, represented by state object. Each state object is responsible for it's own behaviour and when to change state. The object containing the state objects knows nothing about the different behaviours or state or when to transition.
+
+To understand how the state pattern works, we will implement a blog-post workflow in Rust.
+
+\newpage
+
+\paragraph*{lib.rs}\begin{lstlisting}
+    pub struct  Post{
+    state: Option<Box<dyn State>>,
+    content: String,
+}
+
+impl Post{
+    pub fn new() ->Post{
+        Post { 
+            state: Some(Box::new(Draft{})),
+            content: String::new(), 
+        }
+    }
+
+    pub fn add_text(&mut self, text: &str){
+        self.content.push_str(text);
+    }
+
+    pub fn content(&self) -> &str{
+        self.state.as_ref().unwrap().content(self)
+    }
+
+    pub fn request_review(&mut self){ // Method is the same no matter what state we are in.
+        if let Some(state) = self.state.take(){ // take() takes value out of option and leaves None instead. Since Rust doesn't allow unpopulated struct fields, we need to wrap our field inside an Option to move it.
+            self.state = Some(state.request_review());
+        }
+    }
+    pub fn approve(&mut self){ // Method is the same no matter what state we are in.
+        if let Some(state) = self.state.take(){ // take() takes value out of option and leaves None instead. Since Rust doesn't allow unpopulated struct fields, we need to wrap our field inside an Option to move it.
+            self.state = Some(state.approve());
+        }
+    }
+}
+
+trait State {
+    fn request_review(self: Box<Self>) -> Box<dyn State>;
+    fn approve(self: Box<Self>) -> Box<dyn State>;
+    fn content<'a>(&self, post:&'a Post) -> &'a str{
+        ""
+    }
+}
+
+struct Draft {}
+
+impl State for Draft {
+    fn request_review(self: Box<Self>) -> Box<dyn State>{
+        Box::new(PendingReview {})
+    }
+
+    fn approve(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+}
+
+struct PendingReview {}
+
+impl State for PendingReview{
+    fn request_review(self: Box<Self>) -> Box<dyn State>{
+        self
+    }
+
+    fn approve(self: Box<Self>) -> Box<dyn State> {
+        Box::new(Published {})
+    }
+}
+
+struct Published {}
+
+impl State for Published {
+    fn request_review(self: Box<Self>) -> Box<dyn State>{
+        self
+    }
+
+    fn approve(self: Box<Self>) -> Box<dyn State> {
+        self
+    }
+
+    fn content<'a>(&self, post:&'a Post) -> &'a str{ // Need to specify lifetimes 
+        &post.content
+    }
+}
+\end{lstlisting}
+\paragraph*{main.rs}\begin{lstlisting}
+    use blog::Post;
+
+fn main() {
+    let mut post = Post::new();
+
+    post.add_text("I ate a salade for lunch today");
+    assert_eq!("", post.content());
+
+    post.request_review();
+    assert_eq!("", post.content());
+
+    post.approve();
+    assert_eq!("I ate a salade for lunch today", post.content());
+}
+\end{lstlisting}
+\begin{exercise}
+\begin{itemize}
+    \item Add another method called reject which takes post under review and returns it back to draft state.
+    \item Make it so that two apporvals are required before a post is published
+    \item Make it so that can only add text to a post when it is in draft mode.
+\end{itemize}
+\end{exercise}
+
+One of the downsides of State Pattern is that some states are coupled to eachother, if we wanted to add a state between PendingReview and Published, then we would need to update the PendingReview state so that it doesn't transition to Published state.
+
+Another downside is duplication, we have very similar implematation for request\_review and approve methods. By implementating the state pattern exactly as in OOP we are not taking full advantage of Rust, let's try a different approach. We will encode different states as different types.
+
+\paragraph*{lib.rs}\begin{lstlisting}
+    pub struct Post{
+    content: String,
+}
+
+pub struct DraftPost{
+    content: String,
+}
+
+impl Post{
+    pub fn new() -> DraftPost{
+        DraftPost { content: String::new(), }
+    }
+
+    pub fn content(&self)->&str{
+        &&self.content
+    }
+}
+
+impl DraftPost {
+    pub fn add_text(&mut self, text: &str){
+        self.content.push_str(text);
+    }
+
+    pub fn request_review(self) -> PendingReviewPost{
+        PendingReviewPost { content: self.content, }
+    }
+}
+
+pub struct  PendingReviewPost{
+    content: String,
+}
+
+impl PendingReviewPost{
+    pub fn approve(self) -> Post{
+        Post { content: self.content, }
+    }
+}
+\end{lstlisting}
+
+\paragraph*{main.rs}\begin{lstlisting}
+    use blog::Post;
+
+fn main() {
+    let mut post = Post::new();
+
+    post.add_text("I ate a salade for lunch today");
+
+    let post = post.request_review();
+
+    let post = post.approve();
+    assert_eq!("I ate a salade for lunch today", post.content());
+}
+\end{lstlisting}
+
+This new implementation doesn't follow the OOP state pattern, but invalid states are now impossible due to they type system and type checking.
 \end{document}
