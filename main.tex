@@ -5277,4 +5277,140 @@ fn main() {
 \end{lstlisting}
 
 This new implementation doesn't follow the OOP state pattern, but invalid states are now impossible due to they type system and type checking.
+
+\section{Patterns and Matching}
+\begin{definition}
+    \textbf{Patterns} are a special syntax in rust that is used to match against the structure of types. They are consisted of litterals, Destructed (Arrays, Enums, Struct or tuples), variables, wildcards, placeholders. 
+\end{definition}
+These components describe the shape of the data we are working with which we match against values to determine if our program have the correct data to run a piece of code.
+
+\paragraph*{Patterns in match Expressions}
+We use patterns inside the arms of match expressions, for example:\begin{lstlisting}
+ enum Language{
+    English,
+    Spanish,
+    Russian,
+    Japenese
+ }
+
+ let language = Language::English;
+
+ match language{
+    Language::English => println!("Hello World!"),
+    Language::Spanish => println!("Hola Mundo!"),
+    _ => println!("Unsuported Language")
+ }
+\end{lstlisting}
+
+Recall that match expressions have to be exhaustive, so we need to use the catch all pattern denoted by an underscore. Note that the underscore doesn't bind to the variable we are matching on we can instead use a variable like so:\begin{lstlisting}
+    enum Language{
+       English,
+       Spanish,
+       Russian,
+       Japenese
+    }
+   
+    let language = Language::English;
+   
+    match language{
+       Language::English => println!("Hello World!"),
+       Language::Spanish => println!("Hola Mundo!"),
+       lang => println!("Unsuported Language! {:?}", lang)
+    }
+   \end{lstlisting}
+
+\paragraph*{Patterns in conditional if let expressions}
+
+Recall we can use if let expressions if we want to match on some variable, but we only care about one case.\begin{lstlisting}
+fn main() {
+    let authorization_status: Option<&str> = None;
+    let is_admin = false;
+    let group_id: Result<u8,_> = "34".parse();
+
+    if let Some(status) = authorization_status{
+        println!("Authorization status: {}", status);
+    } else if is_admin{
+        println!("Authorization status: admin");
+    } else if let Ok(group_id) = group_id{
+        if group_id > 30{
+            println!("Authorization status: priviledged");
+        } else{
+            println!("Authorization status: basic");
+        }
+    }else {
+        println!("Authorization status: guest");
+    }
+}
+\end{lstlisting}
+The downside of the if let expression is that the compiler doesn't enforce that they are exhaustive, so we can ommit the last else case and our program will compile.
+
+\paragraph*{Patterns in while let expressions}
+
+Similarly to the if let, the while let syntax lets us run a loop as long as the pattern specified continue to match. \begin{lstlisting}
+    let mut stack = Vec::new();
+
+    stack.push(1);
+    stack.push(2);
+    stack.push(3);
+
+    while let Some(top) = stack.pop(){
+        println!("{}", top);
+    }
+\end{lstlisting}
+
+\paragraph*{Patterns in for loops}\begin{lstlisting}
+    let v = vec!['a','b','c'];
+
+    for (index, value) in v.iter().enumerate(){ // enumerate() returns a tuple of index and value 
+        println!("{} is at index {}", value, index);
+    }
+\end{lstlisting}
+
+\paragraph*{Patterns in let statements}
+
+When we write a let statement we are actually writing: \begin{lstlisting}
+    //let PATTERN = EXPRESSION
+\end{lstlisting}
+
+For example rust will check that this pattern and expression match: \begin{lstlisting}
+    let (x,y,z) = (1,2,3);
+    // let (x,y) = (1,2,3) This causes an error since compiler expect a pattern that matches 3 ints.
+    let (x,y,_) = (1,2,3); // If we want to ignore 3, we need to use an underscore.
+\end{lstlisting}
+
+\paragraph*{Patterns in function parameters}
+\begin{lstlisting}
+    fn main() {
+    let point = (3,5);
+    print_coordinates(&point);
+}
+
+fn print_coordinates(&(x,y):&(i32,i32)){
+    println!("Current locationL: ({}, {})", x,y);
+}
+\end{lstlisting}
+This will also work with closures.
+
+\paragraph*{Irrefutable and refutable patterns}
+
+\begin{definition}
+    \textbf{Irrefutable} patterns are patterns that will always match for example:\begin{lstlisting}
+        x = 5;
+    \end{lstlisting}
+
+    \textbf{Refutable} patterns may not match, for example:\begin{lstlisting}
+        let x: Option<&str> = None;
+        if let Some(x) = x{
+            println!("{}", x);
+        }
+    \end{lstlisting}
+    Function paramaters, let statements and for loops only accept Irrefutable patterns. For example:\begin{lstlisting}
+        let x: Option<&str> = None;
+        // let Some(x) = x;  Error, since x is a None variant this will never match.
+        
+        if let x = 5{ // Compiler warning; 'This pattern will always match, so this pattern is useless'
+            println!("{}",x);
+        }
+    \end{lstlisting}
+\end{definition}
 \end{document}
