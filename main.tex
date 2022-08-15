@@ -561,7 +561,7 @@ impl Rectangle{
     }
 }
 
-//Struct allow us to have multiple impl blocs
+//Struct allow us to have multiple impl blocks
 
 // We can also def associated function, unlike methods they aren't tied to an instance of our struct.
 
@@ -4920,7 +4920,7 @@ When it comes to OOP there are three characteristics that all OOP languages shar
 
 Let us talk about each of these characteristics and if they are supported in rust. Objects are made out of data and methods that operate on that data. 
 \subsection{Objects}
-In Rust structs and enums hold data and we can define impl blocs to create methods for them. So even if they are not called objects they function in the same way.
+In Rust structs and enums hold data and we can define impl blocks to create methods for them. So even if they are not called objects they function in the same way.
 
 \subsection{Encapsulation}
 \begin{definition}
@@ -5278,7 +5278,9 @@ fn main() {
 
 This new implementation doesn't follow the OOP state pattern, but invalid states are now impossible due to they type system and type checking.
 
-\section{Patterns and Matching}
+\section{Patterns}
+
+\subsection{Patterns and Matching}
 \begin{definition}
     \textbf{Patterns} are a special syntax in rust that is used to match against the structure of types. They are consisted of litterals, Destructed (Arrays, Enums, Struct or tuples), variables, wildcards, placeholders. 
 \end{definition}
@@ -5413,4 +5415,185 @@ This will also work with closures.
         }
     \end{lstlisting}
 \end{definition}
+
+\subsection{Pattern Syntax}
+
+We are going to talk about all the valid syntax we can use in patterns.
+
+The first pattern we can match on is matching against litterals:\begin{lstlisting}
+    let x = 1;
+    
+    match x{
+        1 => println!("one"),
+        2 => println!("two"),
+        _ => println!("anything"),
+    }
+\end{lstlisting}
+This pattern is useful when we want our code to take action when it recieves a named value.
+
+Next pattern we can match on is named variables:\begin{lstlisting}
+    
+\end{lstlisting}
+
+\section{Advanced topic}
+\subsection{Unsafe Rust}
+
+So far the code we have written has been forced to follow Rust's memory safety guarentee at compile time. But if we want to ignore these memory safetey guarentees we can use \textbf{Unsafe Rust}. This exists for two reasons:\begin{itemize}
+    \item Rust will reject program if it can't guarentee that the program is memory safe even if we know it is.
+    \item The underlying hardware is inheritantly unsafe, so if had to stay safe there is some task we couldn't do which we want to if we are doing low-level system programming for example.
+\end{itemize} 
+To use usafe rust we must use the \textit{unsafe keyword}, gives 5 abilities don't have in safe world:\begin{enumerate}
+    \item Deref raw pointer
+    \item Call unsafe function or method
+    \item Access or modify a mutable static variable
+    \item implement unsafe trait
+    \item Access fields of unions.
+\end{enumerate}
+Unsafe doesn't turn off borrow-checker or disable safety checks. If we have reference in unsafe code it will still be checked.
+
+The onus is on the programmer to make sure that memory inside unsafe blocks is handled properly. If we keep blocks small and isolated it will make the code easier to debug, in case of an error. We can also wrap unsafe code in a safe abstraction and provide a safe API. 
+
+\subsubsection{Raw Pointers}
+Unsafe rust has two types of raw pointers that are similar to references, immutable and mutable raw pointers. The difference between raw pointers and refenreces/smart pointers, is that raw pointers:\begin{itemize}
+    \item bypass borrow rules, 
+    \item not guarenteed to point to valid mem, 
+    \item are allowed to be null, 
+    \item don't implement automatic cleanup
+\end{itemize}
+\begin{lstlisting}
+    let mut num = 5;
+    let r1 = &num as *const i32; // immutable raw pointer, can't be direcely assigned after being deref
+    let r2 = &mut num as *mut i32; // mutable raw pointer
+
+    // Rust allows us to create raw pointers but we can't deref them if we are not in unsafe block.
+
+    unsafe{
+        println!("r1 is: {}", *r1);
+        println!("r2 is: {}", *r2);
+    }
+\end{lstlisting}
+
+\subsubsection{Unsafe methods and function}
+
+\begin{lstlisting}
+    unsafe fn dangerous (){} // unsafe means that when calling functions we need to put in the correct arguments, it implies we read the function's documentation and are taking responsibility for upholding the function contract.
+
+    unsafe{ // If we remove the unsafe block it will call an error. The body of unsafe function is an unsafe block so we don't have to write an unsafe block inside function.
+        dangerous();
+    }
+\end{lstlisting}
+
+\paragraph*{Safe abstraction of unsafe code}
+
+Just because a function contains unsafe code doesn't make it an unsafe function. We can wrap unsafe code inside a safe function.
+    \begin{lstlisting}
+        //Example: split_at_mut(), is a safe method that split a slice into two slices along index passed in.
+        
+        let mut v = vec![1,2,3,4,5,6];
+
+    let r = &mut v[..];
+
+    let (a,b) = r.split_at_mut(3);
+
+    assert_eq!(a, &mut [1,2,3]);
+    assert_eq!(b, &mut [4,5,6]);
+    \end{lstlisting}
+\subparagraph*{Naïve implementation of split at mut}\begin{lstlisting}
+fn split_at_mut(slice: &mut [i32], mid: usize) -> (&mut [i32], &mut [i32]) {
+    let len = slice.len();
+
+    assert!(mid <= len);
+
+    (&mut slice[..mid], &mut slice[mid..]) // Error: Cannot borrow slice as mutable more than once at a time. 
+}
+\end{lstlisting}    
+The borrow checker can't understand that we are borrowing different parts of our slice. We know our code is ok but Rust can't figure it out. We need to use unsafe block: 
+\subparagraph*{Unsafe implementation}\begin{lstlisting}
+    // Recall slice are pointer to data and length of data.
+    let len = slice.len();
+    let ptr = slice.as_mut_ptr(); // Get raw mutable to our slice
+
+    assert!(mid<=len); 
+
+    unsafe{ 
+        (
+            slice::from_raw_parts_mut(ptr, mid), // Creates a new slice with pointer to some data and length
+            slice::from_raw_parts_mut(
+                ptr.add(mid), len-mid // ptr.add returns pointer after some offset.
+            ),
+        )
+    }
+    // From raw_parts_mut() and add() method are unsafe since they must trust that the raw pointer passed in and passed out are valid.  
+}
+\end{lstlisting}
+Note even if function has unsafe block it is safe.
+
+\subsubsection{Functions that call external code}
+sometimes we need to interact code in another language. In this case Rust has the extern keyword, which let's use a foreign language interface, ffi. A ffi is a way for a prog to define a function that another language can call.
+
+\paragraph*{Calling a function from C}
+
+\begin{lstlisting}
+    extern "C"{ //"C" defines which application binary interface, ABI the external function uses. ABI defines how to call the function at the assembly level.
+    // abs function from C std library.
+        fn abs(input: i32) -> i32; // Specify the name and signature of foreign function we want to call.
+    }
+    
+    // calling function in extern block is always unsafe.
+    unsafe{
+        println!("Absolute value of -3 according to C: {}", abs(-3));
+    }
+\end{lstlisting}
+
+\paragraph*{Allowing other languages to use our code}
+\begin{lstlisting}
+    #[no_mangle] // no_mangle is to let the compile know not mangle(when the compiler changes the name of our function) our function name
+    pub extern  "C" fn call_from_c(){
+        println!("Just called a Rust function from C!");
+    }
+\end{lstlisting}
+
+
+\subsubsection{Accessing and modifying mutable static variables}
+
+\begin{definition}
+    Global variables in rust are supported but can be problematic with ownership rules. In rust global vartiables are called \textbf{static variables}. The convention is to write the variable in screaming snakecase. We must also annotate the life time of variable and it must have a static lifetime.
+
+\begin{lstlisting}
+    static  HELLO_WORLD: &str = "Hello, world!"; // In this case don't have to specify lifetime since Rust infers the lifetime of &str
+    
+    fn main(){
+        println!("name is: {}", HELLO_WORLD);
+    }
+\end{lstlisting}
+The differences with immutable static and constants is that: static variables have fixed address in memory, constants can duplicate their data whenever they are used. If we are referencing constant in code base, the compiler can replace constant with concrete value.
+
+Also, static variables can be mutable but accesing an modifying mutable static variables in unsafe.
+\end{definition}
+
+\paragraph*{Mutating static variable}\begin{lstlisting}
+    static  mut COUNTER: u32 = 0;
+
+fn add_to_count(inc:u32){
+    unsafe{
+        COUNTER += inc;
+    }
+}
+
+fn main(){
+    add_to_count(3);
+    
+    unsafe{ // Can only access COUNTER in unsafe block.
+        println!("COUNTER: {}", COUNTER);
+    }
+}
+\end{lstlisting}
+
+\subsubsection{Implementing an unsafe trait}
+A trait is unsafe if at least one its methods is unsafe
+
+\begin{lstlisting}
+    
+\end{lstlisting}
+
 \end{document}
