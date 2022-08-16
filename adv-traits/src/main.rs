@@ -246,9 +246,11 @@ fn main() {
 
     p.outline_print();
 
-    let v = Wrapper(vec![String::from("1"),String::from("2"),String::from("Hello")]);
+    let w = Wrapper(
+        vec![String::from("Hello"), String::from("world")]
+    );
 
-    println!("{}", v);
+    println!("w = {}", w);
 
 }
 

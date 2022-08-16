@@ -5904,14 +5904,18 @@ impl fmt::Display for Wrapper{
 }
 
 fn main() {
-    let v = Wrapper(vec![String::from("1"),String::from("2"),String::from("Hello")]);
+    let w = Wrapper(
+        vec![String::from("Hello"), String::from("world")]
+    );
 
-    println!("{}", v);
+    println!("w = {}", w);
 
-    // Output: [1, 2, Hello]
+    // Output: w = [Hello, world]
 }
 
 \end{lstlisting}
 
 The problem is that the Wrapper type doesn't implement the methods implemented for vector. If we did want the new type to implement every mothod on type it is holding we can implement deref trait so that deref wrapper returns the value. If we don't want the wrapper to have all the methods we need to imnplemtent each method individually.
+
+
 \end{document}
