@@ -81,7 +81,7 @@ fn main() {
 
 
 
-// Implementing split_at_mut using only safe code vs unsafe:
+// Implementing split_at_mut using only safe code vs:
 
 fn split_at_mut(slice: &mut [i32], mid: usize) -> (&mut [i32], &mut [i32]) {
     // let len = slice.len();

@@ -5432,7 +5432,14 @@ The first pattern we can match on is matching against litterals:\begin{lstlistin
 This pattern is useful when we want our code to take action when it recieves a named value.
 
 Next pattern we can match on is named variables:\begin{lstlisting}
-    
+    let x = Some(5);
+    let y = 10;
+
+    match x{
+        Some(50) => println!("Got 50"),
+        Some(y) => println!("Matched, y = {:?}", y),
+        _ => println!("Default case, x = {:?}", x),
+    }
 \end{lstlisting}
 
 \section{Advanced topic}
@@ -5593,7 +5600,318 @@ fn main(){
 A trait is unsafe if at least one its methods is unsafe
 
 \begin{lstlisting}
-    
+unsafe trait Foo{
+    // methods go here
+}
+
+unsafe impl Foo for i32{
+    // method implementation goes here.
+}
 \end{lstlisting}
 
+\subsubsection{Unions}
+
+The fifth ability with unsafe code is able to access field of unions. 
+
+A union is similar to a struct but only one field is used in each instance. Primarily used to interface with C unions, it is unsafe to access field of a union since Rust can't guarrentee what type stored in union is for a given instance.
+
+\subsection{Advanced Traits}
+\begin{definition}
+    \textbf{Associated types} are placeholders added to traits and methods can use. For example:\begin{lstlisting}
+        pub trait Iterator{
+    type Item; // associated type
+
+    fn next(&mut self) -> Option<Self::Item>;
+}
+    \end{lstlisting}
+    What is the difference between an associated type and generic? They both allow us to define a type without specifying concrete value. In associated type we have only one concrete type per implementation, but generics can have many concrete types
+
+    \paragraph*{Associated Types implementation}\begin{lstlisting}
+    struct Counter{}
+
+    impl Iterator for Counter{
+        type Item = u32; // Can't have another implemtentation where item is different 
+
+        fn next(&mut self) -> Option<Self::Item>{
+            Some(0)
+        }
+    }
+
+
+// We can't have a second implementation like this:
+
+    impl Iterator for Counter{
+        type Item = u16; 
+
+        fn next(&mut self) -> Option<Self::Item>{
+            Some(0)
+        }
+    }
+    \end{lstlisting}
+
+    We can have many implemetnations with generics:\begin{lstlisting}
+    pub trait GenericIterator<T>{
+        fn next(&mut self) -> Option<T>;
+    }
+
+    // Two implementation of GenericIterator.
+
+    impl GenericIterator<u32> for Counter{ 
+        fn next(&mut self) -> Option<u32>{
+            Some(0)
+        }
+    }
+
+    impl GenericIterator<u16> for Counter{ 
+        fn next(&mut self) -> Option<u16>{
+            Some(0)
+        }
+    }
+    \end{lstlisting}
+\end{definition}
+
+When deciding between generics and iterators we need to know if we need multiple implementation for a single type. 
+
+In the case of Iterators it makes sense to use associated type, since for any implementation we want next() to return the same type.
+
+
+\paragraph*{Default Generic Type parameters and type overloading}
+
+Generic type parameters can specify a default concrete type so that implementers only need to specify a concrete type if it is not the default.
+
+For example when customizing the behaviour of operator, aka operator overlead. Rust can let us customise the semantics of certain op with associated traits in std lib, for example Add operator.
+\begin{lstlisting}
+    
+ use std::ops::Add;
+
+ #[derive(Debug,PartialEq)]
+ struct Point{
+    x:i32,
+    y:i32,
+ }
+
+impl Add for Point{
+    type Output = Point;
+    
+    fn add(self,other:Point) ->Point{
+        Point { 
+            x: self.x+other.x, 
+            y: self.x+other.x 
+        } 
+    }
+}
+
+fn main(){
+    assert_eq!(
+        Point{x:1,y:0}+Point {x:2,y:3},
+        Point{x:3,y:3}
+    );
+}
+\end{lstlisting}
+
+\subparagraph*{How is the Add Trait implemented?}\begin{lstlisting}
+    trait OurAdd<Rhs=Self>{  
+    type Output;
+
+    fn add(self,rhs:Rhs) -> Self::Output;
+}
+\end{lstlisting}
+Add trait has generic called Rhs(right hand side), it's default concrete type is self, the object implenting the add trait. So we don't have to specify it in our Points example. Here is an example when we do need to specify it:
+
+\subparagraph*{Specifying generic}\begin{lstlisting}
+    
+struct Millimeters(u32);
+struct Meters(u32);
+
+impl OurAdd<Meters> for Millimeters{
+    type Output = Millimeters;
+
+    fn add(self,rhs:Meters) -> Millimeters {
+        Millimeters(self.0+(rhs.0*1000))
+    }
+}
+\end{lstlisting}
+
+In general we can use default generic type param for two reasons:\begin{itemize}
+    \item Extend a type without breaking a code.
+    \item Adding customization for code that most users won't need.  
+\end{itemize}
+    
+
+Now we move on to calling methods with the same name. We can have two traits with same methods and implement both those traits on one type. We can also implement on a type itself with the same name as in another method.
+
+\newpage
+
+\begin{lstlisting}
+    
+trait Pilot{
+    fn fly(&self);
+}
+
+trait Wizard{
+    fn fly(&self);
+}
+
+struct Human;
+
+impl Human{
+    fn fly(&self){
+        println!("*waiving arms furiously*");
+    }
+}
+
+impl Pilot for Human{
+    fn fly(&self) {
+        println!("This is your captain speaking");
+    }
+}
+
+impl Wizard for Human{
+    fn fly(&self){
+        println!("Up!");
+    }
+}
+
+fn main() {
+    person.fly(); // When we run we get *waiving arms furiously* the method on Human struct
+
+    Pilot::fly(&person); // To run the Pilot implementation
+    Wizard::fly(&person);// To run the Wizard implementation
+}
+\end{lstlisting}
+
+What about if we are using associated functions? Since fly method takes self as a parameter, if we had two structs implemetning Wizard trait we know which method to call. This is not true for asssociated function.
+
+
+\newpage
+
+\begin{lstlisting}
+    
+
+    trait Pilot2{
+        fn fly();
+    }
+    
+    trait Wizard2{
+        fn fly();
+    }
+    
+    struct Human2;
+
+    
+    impl Human2{
+        fn fly(){
+            println!("*waiving arms furiously*");
+        }
+    }
+    
+    impl Pilot2 for Human2{
+        fn fly() {
+            println!("This is your captain speaking");
+        }
+    }
+    
+    impl Wizard2 for Human2{
+        fn fly(){
+            println!("Up!");
+        }
+    }
+fn main() {
+    Human2::fly(); // Associated function in struct is called
+
+    <Human2 as Wizard2>::fly(); // Fully qualified syntax to call fly function on Wizard2 trait as implemented for Human2 
+}
+\end{lstlisting}
+
+\paragraph*{Supertraits}
+
+\begin{definition}
+    Trait dependent on functionality on other trait, the trait we rely on is called \textbf{supertrait}.
+
+    If we naïvely define a trait like so:\begin{lstlisting}       
+ trait OutlinePrint {
+         fn outline_print(&self){
+             let output = self.to_string(); 
+             let len = output.len();
+             println!("{}", "*".repeat(len+4));
+             println!("*{}*", " ".repeat(len+2));
+             println!("* {} *", output);
+             println!("*{}*", " ".repeat(len+2));
+             println!("{}", "*".repeat(len+4));
+         }
+     }
+    \end{lstlisting}
+
+We get an error, since  calling to string since don't know that self implements to.string. Since to string is defined in Display trait so we want to make sure anything that implements OutlinePrint implemetents Display.
+
+\paragraph*{Correct implemtation}\begin{lstlisting}
+    
+use std::fmt; // This is where Display is defined.
+
+
+trait OutlinePrint: fmt::Display { // This says that our trait depends on Display trait.
+    fn outline_print(&self){
+        let output = self.to_string(); 
+        let len = output.len();
+        println!("{}", "*".repeat(len+4));
+        println!("*{}*", " ".repeat(len+2));
+        println!("* {} *", output);
+        println!("*{}*", " ".repeat(len+2));
+        println!("{}", "*".repeat(len+4));
+    }
+}
+\end{lstlisting}
+
+What if we implement OutlinePrint but not Display? We get an error! The correct implemnntation is like so:\begin{lstlisting}
+    
+impl OutlinePrint for Point{}
+
+impl fmt::Display for Point{
+    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result{
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+\end{lstlisting}
+
+\paragraph*{Implementation}\begin{lstlisting}
+fn main(){
+    let p = Point{x:2,y:57};
+
+    p.outline_print();
+}
+
+    // Output:
+***********
+*         *
+* (2, 57) *
+*         *
+***********
+\end{lstlisting}
+\end{definition}
+
+
+Finally we will look at the new type pattern.  We learned about Orphan rule, we can define trait on a type as long as triat or type is defined in our crate, the newtype pattern allows us to get around this. We don this by create a tuple with one field which is the type we are wrapping.
+
+For example, how do we implement Display trait for Vector? They are both defined outside of our crate. Answer: We wrap vector in another object.
+
+\begin{lstlisting}
+    struct Wrapper(Vec<String>);
+
+impl fmt::Display for Wrapper{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.0.join(", "))
+    }
+}
+
+fn main() {
+    let v = Wrapper(vec![String::from("1"),String::from("2"),String::from("Hello")]);
+
+    println!("{}", v);
+
+    // Output: [1, 2, Hello]
+}
+
+\end{lstlisting}
+
+The problem is that the Wrapper type doesn't implement the methods implemented for vector. If we did want the new type to implement every mothod on type it is holding we can implement deref trait so that deref wrapper returns the value. If we don't want the wrapper to have all the methods we need to imnplemtent each method individually.
 \end{document}
