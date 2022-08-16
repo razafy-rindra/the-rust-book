@@ -5895,7 +5895,8 @@ Finally we will look at the new type pattern.  We learned about Orphan rule, we 
 For example, how do we implement Display trait for Vector? They are both defined outside of our crate. Answer: We wrap vector in another object.
 
 \begin{lstlisting}
-    struct Wrapper(Vec<String>);
+use std::fmt;
+struct Wrapper(Vec<String>);
 
 impl fmt::Display for Wrapper{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -5917,5 +5918,104 @@ fn main() {
 
 The problem is that the Wrapper type doesn't implement the methods implemented for vector. If we did want the new type to implement every mothod on type it is holding we can implement deref trait so that deref wrapper returns the value. If we don't want the wrapper to have all the methods we need to imnplemtent each method individually.
 
+We can also use the newtype pattern for safety, for example if we want to store a tuple of integers one being ID number and one being Age, in order to not get them confused we wrap the integers in corresponding struct.
 
+\begin{lstlisting}
+    
+struct Age(u32);
+
+struct ID(u32);
+
+// Pass in Age and ID in functions instead of a raw integer.
+\end{lstlisting}
+
+Another use of newtype pattern is to abstract away implementation details. We can create a People type which wraps a Hash maps of integers to strings. Code using People type will only have access to public API and won't have knowledge of the internals.
+
+New type is a light weight way to achieve encapsulation. In addition to new type, we can use type Alias to give existing types new names.
+
+\begin{lstlisting}
+    fn main() {
+    type Kilometers = i32; // Not a new type but a synonym for i32
+
+    let x: i32 = 5;
+    let y: Kilometers = 5;
+
+    println!("x+y = {}", x+y); // Kilometer treated like i32
+}
+\end{lstlisting}
+The main use of alias is to reduce repetition, for example if we have a lengthy type like in this example:\begin{lstlisting}
+    let f: Box<dyn Fn() + Send + 'static> = 
+        Box::new(|| println!("hi"));
+
+    fn takes_long_type(f: Box<dyn Fn() + Send + 'static>){
+        //
+    }
+
+    fn returns_long_type() -> Box<dyn Fn() + Send + 'static>{ 
+        //
+    }
+\end{lstlisting} 
+
+\paragraph*{More concise}\begin{lstlisting}
+    type Thunk = Box<dyn Fn() + Send + 'static> // Thunk means code that is evaluated later
+    
+    let f: Thunk = 
+        Box::new(|| println!("hi"));
+
+    fn takes_long_type(f: Thunk){
+        //
+    }
+
+    fn returns_long_type() -> Thunk{ 
+        //
+    }
+\end{lstlisting}
+
+\paragraph*{The never type}
+
+The never type is denoted by ! and means that a function will never return. Why is this useful? Recall the guessing game with code that parse user input into integer:\begin{lstlisting}
+        while game_in_progress{
+            let guess: u32 = match guess.trim().parse(){
+                Ok(num) => num,
+                Err(_) => continue,
+            };
+        }
+\end{lstlisting}
+How does one arm return a u32 and another arm of the match statement ends with continue? continue is a never type, since one arm returns u32 and other ! (can never return) Rust can conclude that this expression returns u32.
+
+We are allowed to write this code since if we get in error arm continue will not return anything so guess will not be assigned. So guess can only be assigned to a u32.
+
+
+Likewise panic! returns a never type. Another expression with never type is a loop:\begin{lstlisting}
+    fn main(){
+        print!("forever ");
+
+        loop{
+            print!("and ever ");
+        }
+    }
+\end{lstlisting}
+
+Here the loop never ends so the value of this expression a never type. This is not true if we had a break statement in loop.
+
+
+\paragraph*{Dynamically Sized Types(DST)}
+
+\begin{definition}
+    \textbf{DST} are types who's size can only be determined at run time. For example the str type:\begin{lstlisting}
+        let s1: str = "Hello there!";
+        let s2: str = "How's it going?";
+    \end{lstlisting}
+
+    This causes a bunch of errors since the compiler doesn't know the size of s1 and s3, we need to use \&str instead of str. The string slice structure, \&str stores two values an adress pointing the location of the string in memory and the length of the string. Both these propoerties have a type usize so we know their size at compile time.
+\end{definition}
+
+In general this is how Dynamically sized types are used like this in rust. They have an extra bit of metadata storing the size of dynamic info, The golden rule is that we must store them behind some kind of pointer. For example str is behind a refenreces in \&str, but we can also store it in a box pointer for eh.
+
+\
+
+Traits are also DST, trait objects must be behind some sort of pointer. Rust has a special trait called the size trait that determines what type of whether a type size can be known at compile time. Rust implicitely adds the Sized trait bound to every generic function, so in general generic functions only work on types whoes size is known at compile time. However we can use the syntax: \begin{lstlisting}
+    fn generic<T: ?Sized>(t: &T){}
+\end{lstlisting}
+To relax this restriction. This syntax means that T may be sized or not. Since T can be unsized we must put our argument type behind some sort of pointer. 
 \end{document}
