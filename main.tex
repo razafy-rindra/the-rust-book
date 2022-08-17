@@ -6118,4 +6118,26 @@ The two closures in our function have different types, and the impl trait synyax
 }
 \end{lstlisting}
 We need to wrap our closure in Box smart pointer, since rust does not know the size of our trait object.
+
+\subsection{Macros}
+Macros allow us write code that writes other code. This is metaprogramming. We can think of Macros as functions whose input and output is code.
+
+Examples of macros we used are prinln! and vec!
+
+The key difference between macros and functions:\begin{itemize}
+    \item Functions must declare the number of param they accept but macros can accept a variable number of param
+    \item Functions are called at run time, macros are expanded before function finished compiler. 
+\end{itemize}
+Macros are stronger than functions but put a level of complexity in our code.
+
+Two types of Macros: Declarative Macros and Procedural Macros.
+\subsubsection{Declarative Macros}
+Declarative Macros are most used form of macros in Rust, they let us write something similar to a match expression. 
+
+\paragraph*{vec! declaritive macro}\begin{lstlisting}
+    // note we can pass in different types and a different amount of arguments in the macros:
+        let v1: Vec<u32> = vec![1,2,3]; // 3 args
+        let v2: Vec<&str> = vec!["a","b","c","d","e"]; // 5 args
+\end{lstlisting}
+Implementation of the vec! Macro is in the lib.rs file in dec-macro the folder. 
 \end{document}
