@@ -6140,4 +6140,111 @@ Declarative Macros are most used form of macros in Rust, they let us write somet
         let v2: Vec<&str> = vec!["a","b","c","d","e"]; // 5 args
 \end{lstlisting}
 Implementation of the vec! Macro is in the lib.rs file in dec-macro the folder. 
+
+\subsubsection{Procedural Macros}
+
+Procedural Macros are like functions, they take code as input operate on it and produce code as output. In contrast with declarative macros which match against patterns and replace code with other code.
+
+Kinds of procedural macros:Custom derived, attribute-like, function-like. For now procedural marcros must be defined in their own crate with a custom crate type.
+
+
+\begin{example}
+    \item \paragraph*{The hello macro}\begin{lstlisting}
+        // procedural macros are defined using this similar syntax.
+
+ use proc_macro; // Defines TokenStream
+
+ #[some_attribute] // attribute specifies the kind of procedural macro we are creating. 
+pub fn some_name(input: TokenStream) -> TokenStream{ // Name of function is name of macro.
+    //..
+}
+
+// Token smallest elemetns of a program, for e.g. keywords, identifiers, operators, seperators, litterals.
+
+pub trait HelloMacro{
+    fn hello_macro();
+}
+
+// What if we wanted our default implementation of this function to print hello macro followed by the type on which the trait is implemented on. We must use our macro to generate the defaule implementation.
+\end{lstlisting}
+
+Now we need to define the macro in it's own crate. Which is called hello\_macro\_derive.\begin{lstlisting}
+    extern crate proc_macro; // Allows us to read and manipulate rust code
+
+use proc_macro::TokenStream;
+use syn; // Allows us to take string of rust code and turn into syntax tree data struct
+use quote::quote; // Can take syntax tree data structure into rust code.
+
+#[proc_macro_derive(HelloMacro)] // Indicates this is custom derived macro
+pub fn hello_macro_derive(input: TokenStream) -> TokenStream{
+    // Construct a representation of Rust code as a syntax tree we can manipulate
+    let ast = syn::parse(input).unwrap(); // Appropriate to panic if error since this function is only called at compile time.
+
+    // Build the trait implementation
+    impl_hello_macro(&ast)
+}
+
+
+fn impl_hello_macro(ast: &syn::DeriveInput) -> TokenStream{
+    let name = &ast.ident; // Extract out name of type we are working on.
+    let gen = quote!{ // quote macro to output some rust code
+        impl HelloMacro for #name{
+            fn hello_macro(){
+                println!(
+                    "Hello, Macro! My name is {}!",
+                    stringify!(#name) // takes an expression and turn it into string without evaluating it.
+                );
+            }
+        }
+    };
+    gen.into()
+}
+\end{lstlisting}
+
+Finally we can use this macro\begin{lstlisting}
+    
+use hello_macro::HelloMacro;
+use hello_macro_derive::HelloMacro;
+
+// Two use statements since we have two crates hello_macro and hello_macro_derive. Each crate stil has to be published seperately and code using our crate has to bring each crate into scope.
+
+
+#[derive(HelloMacro)]
+struct Pancakes;
+
+fn main(){
+    Pancakes::hello_macro();
+}
+
+// Output: Hello, Macro! My name is Pancakes!
+\end{lstlisting}
+\end{example}
+
+\paragraph*{Attribute-like macros}
+Similar to custom derived macros expect instead of generating code for derive attribute we can create a custom attribute. This only works on struct and enums.
+\begin{lstlisting}
+     #route[(GET, "/")]
+ fn index(){
+     //..
+ }
+
+ #[proc_macro_attribute]
+ pub fn route(
+     attr: TokenStream, // Get, "/"
+     item: TokenStream // fn index() {}
+ ) -> TokenStream{
+     //..
+ }
+\end{lstlisting}
+
+\paragraph*{Function-like macros}
+Look like function calls but more flexible. They can take a variable number of args and the operate on rust code.\begin{lstlisting}
+    let sql = sql!(SELECT * FROM post WHERE id=1);
+
+ #[proc_macro]
+ puu fn sql(input: TokenStream) -> TokenStream{
+
+ }
+\end{lstlisting}
+
 \end{document}
