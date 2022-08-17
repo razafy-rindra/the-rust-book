@@ -6018,4 +6018,104 @@ Traits are also DST, trait objects must be behind some sort of pointer. Rust has
     fn generic<T: ?Sized>(t: &T){}
 \end{lstlisting}
 To relax this restriction. This syntax means that T may be sized or not. Since T can be unsized we must put our argument type behind some sort of pointer. 
+
+\subsection{Closures and Function Pointers}
+\begin{definition}
+    We can not only pass closures into functions, but also functions into functions with \textbf{function pointers}.
+
+    \begin{lstlisting}
+    fn add_one(x: i32) -> i32{
+        x+1
+    }
+
+    fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32{
+        f(arg)+f(arg)
+    }
+
+    fn main() {
+        let answer = do_twice(add_one, 5);
+        println!("The answer is: {}", answer);
+    //Output: The answer is: 12       
+    }
+\end{lstlisting}
+\end{definition}
+Unlike closures, fn is a type rather than a trait, so we can specify it directly instead of using one of the function traits as a trait bound. Recall the three closure traits: Fn, FnMut and FnOnce (closure takes ownership). 
+Function pointers implement all three closure traits, which is why it is best practice to use closures: 
+
+\begin{lstlisting}
+    fn add_one(x: i32) -> i32{
+    x+1
+}
+
+    fn do_twice<T>(f: T, arg: i32) -> i32
+    where T: Fn(i32)->i32{
+        f(arg)+f(arg)
+    }
+    fn main() {
+        let answer = do_twice(add_one, 5);
+        println!("The answer is: {}", answer);
+    //Output: The answer is: 12       
+    }
+\end{lstlisting}
+
+As we see, if we use closures we still can use a function pointer as an argument. One place where we only want to accept function pointers instead of function pointers and closures, is when interfacing with a language that dfoesn't use closures like C. 
+\newpage
+\begin{example}
+    \item \paragraph*{Using the map function}\begin{lstlisting}
+        fn main() {
+            let list_of_numbers = vec![1,2,3];
+            let list_of_strings: Vec<String> = 
+                list_of_numbers
+                    .iter()
+                    // We can pass in a closure in map function:
+                    //.map(|i| i.to_string())
+                    // We can also pass in a function pointer in map:
+                     .map(ToString::to_string)
+                    .collect();
+        
+            println!("{:?}", list_of_strings);
+        //Output: ["1", "2", "3"]
+        }
+\end{lstlisting}
+\item \paragraph*{Other useful pattern with tuple}\begin{lstlisting}
+    enum Status{
+        Value(u32),
+        Stop,
+    }
+
+    // Tuple string uses paranthesis to initialise values inside tuple like a function call. These initialiser are implemented as functions that take in args and returns tuple struct. 
+
+    let list_of_statuses: Vec<Status> = 
+        (0u32..20).map(Status::Value).collect(); // map treats Value like a function pointer.
+\end{lstlisting}
+\end{example}
+\paragraph*{Returning closures from functions}
+
+We need to use the impl syntax:\begin{lstlisting}
+    fn returns_closure() -> impl Fn(i32) -> i32{
+    |x| x+1
+}
+\end{lstlisting}
+
+The impl syntax doesn't always work:\begin{lstlisting}
+     fn other_returns_closure(a: i32) -> impl Fn(i32) -> i32{
+     if a>0{
+         move |b| a+b
+     } else{
+         move |b| a-b // Error: no two closures even if identical have the same type. Consider Boxing our closure.
+     }
+ }
+\end{lstlisting}
+The two closures in our function have different types, and the impl trait synyax only works if we are returning one type. Instead of using the impl trait syntax we can return a trait object. 
+
+\begin{lstlisting}
+    fn other_returns_closure(a: i32) -> Box<dyn Fn(i32) -> i32>{
+    if a>0{
+        Box::new(move |b| a+b)
+    } else{
+        Box::new(move |b| a-b) 
+    }
+}
+\end{lstlisting}
+We need to wrap our closure in Box smart pointer, since rust does not know the size of our trait object.
 \end{document}
