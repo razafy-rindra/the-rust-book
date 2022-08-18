@@ -6247,4 +6247,109 @@ Look like function calls but more flexible. They can take a variable number of a
  }
 \end{lstlisting}
 
+\section{Building a Web Server}
+\begin{definition}
+    TCP transport layer protocol, describing how data is transfered from one computer to another. HTTP is application level protocol, describing how data is structered.
+\end{definition}
+\newpage
+\paragraph*{Reading request:}\begin{lstlisting}
+    use std::net::TcpListener;  
+use std::net::TcpStream;
+use std::io::prelude::*;
+
+
+fn main() {
+    let listener = 
+        TcpListener::bind("127.0.0.1:7878").unwrap(); //Since we are doing practice we are just going to call unwrap and not deal with error case
+
+    for stream in listener.incoming(){
+        let stream = stream.unwrap(); //Shadowing
+
+        handle_connection(stream);
+    }
+}
+
+fn handle_connection(mut stream: TcpStream){
+    let mut buffer = [0; 1024]; // A buffer of 1024 bytes.
+    
+    stream.read(&mut buffer).unwrap(); // Populate buffer with data from stram
+    println!(
+        "Request: {}", 
+        String::from_utf8_lossy(&buffer[..]) // converts a slice of bytes into string including invalid characters
+    )
+}
+\end{lstlisting}
+
+After running our program we get a bunch of GET request. The structure of the request:\begin{itemize}
+    \item The first line is the request line, it contains info such as HTTP method used, URI and HTTP version number.
+    \item Under the request line we have various request headers and body. But since this is a get request we don't have a body.
+\end{itemize}
+
+\paragraph*{Writting a response:}
+A response must be in the following format:
+\begin{lstlisting}
+    // status line: HTTP-Version Status-Code Reason-Phrase CRLF (carriage return line feed sequence)
+    // headers CRLF
+    // message-body
+    // 
+    // ex: HTTP/1.1 200 Ok\r\n\r\n 
+    // This response contains no headers and no message body. HTTP-version is HTTP/1.1, Status-Code is 200 (standard status code for sucess), reason phrase is OK, and a CRLF is \r\n 
+\end{lstlisting}
+\newpage
+\begin{lstlisting}
+    use std::fs;
+use std::net::TcpListener;  
+use std::net::TcpStream;
+use std::io::prelude::*;
+
+
+fn main() {
+    let listener = 
+        TcpListener::bind("127.0.0.1:7878").unwrap(); //Since we are doing practice we are just going to call unwrap and not deal with error case
+
+    for stream in listener.incoming(){
+        let stream = stream.unwrap(); //Shadowing
+
+        handle_connection(stream);
+    }
+}
+
+fn handle_connection(mut stream: TcpStream){
+    let mut buffer = [0; 1024]; // A buffer of 1024 bytes.
+    
+    stream.read(&mut buffer).unwrap(); // Populate buffer with data from stram
+    
+    let get = b"GET / HTTP/1.1\r\n"; // b prefix gives us byte array representing our string
+
+    let (status_line, filname) = 
+        if buffer.starts_with(get){
+            ("HTTP/1.1 200 Ok", "index.html")
+        }else{
+            ("HTTP/1.1 404 NOT FOUND", "404.html")
+        };
+
+    let contents = fs::read_to_string(filname).unwrap();
+
+    let response = format!(
+        "{}\r\nContent-Length: {}\r\n\r\n{}",
+        status_line,
+        contents.len(),
+        contents
+    );
+    stream.write(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
+}
+\end{lstlisting}
+
+\newpage
+We are now going to create a multi-threaded server. Indeed we built a single threaded server, but in this case if we get two request at the same time, our server will process the first request then
+the second request. If our first request took a long time to process the second request will have to wait. Terrible user experience.
+
+We will solve this with a thread pool, we have a fixed number of threads in a thread pool. When request come in server a thread will pick up the request and process it. When it is finished it will return in the thread pool to take on new requests.
+The reason we have a fixed number of threads, is that we don't want a person to take down our server by issuing a ton of request that spin up a ton of threads and exhaust the resources of our server.
+
+\paragraph*{Graceful shutdown and clean-up}
+
+(Check the server folder in the github to see the code).
+
 \end{document}
